@@ -1,0 +1,19 @@
+name: Hyper_VS_Build
+
+on:
+  push:
+    branches: [ main ]
+    
+jobs:
+  clone:
+    name: Clone
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup SSH
+      uses: MrSquaare/ssh-setup-action@v1
+      with:
+          host: github.com
+          private-key: ${{ secrets.CLONE_KEY }}
+          
+    - name: Clone repository
+      run: git clone git@github.com:buihien224/vietsub_erofs_tool.git
