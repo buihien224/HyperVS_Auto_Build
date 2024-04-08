@@ -24,6 +24,7 @@ on:
 jobs:
   Build:
     runs-on: ubuntu-latest
+    environment: AutoBuild
     steps:
        - name: Test parameter
          run: |
