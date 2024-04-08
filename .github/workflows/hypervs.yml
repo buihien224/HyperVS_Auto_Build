@@ -3,6 +3,8 @@ name: Hyper_VS_Build
 on:
   push:
     branches: [ main ]
+
+  workflow_dispatch:
     
 jobs:
   clone:
