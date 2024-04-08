@@ -10,6 +10,7 @@ jobs:
   clone:
     name: Clone
     runs-on: ubuntu-latest
+    environment: AutoBuild
     steps:
       - name: Checkout
         uses: actions/checkout@v4.1.1
