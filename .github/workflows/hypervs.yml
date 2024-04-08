@@ -11,11 +11,8 @@ jobs:
     name: Clone
     runs-on: ubuntu-latest
     steps:
-    - name: Setup SSH
-      uses: MrSquaare/ssh-setup-action@v1
-      with:
-          host: github.com
-          private-key: ${{ secrets.CLONE_KEY }}
-          
-    - name: Clone repository
-      run: git clone git@github.com:buihien224/vietsub_erofs_tool.git
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+        with:
+          repository: buihien224/vietsub_erofs_tool
+          token: ${{ secrets.CLONE_KEY }}
