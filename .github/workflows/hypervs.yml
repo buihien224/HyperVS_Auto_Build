@@ -36,7 +36,7 @@ jobs:
 
   Build:
     needs: Auth
-    if: ${{ needs.Auth.outputs.active }}
+    if: ${{ fromJson(needs.Auth.outputs.active) }}
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
