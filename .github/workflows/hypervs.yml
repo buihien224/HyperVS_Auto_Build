@@ -28,7 +28,7 @@ jobs:
   Auth:
     runs-on: ubuntu-latest
     outputs:
-      condition-result: ${{ steps.evaluate.outputs.active }}
+      active: ${{ steps.evaluate.outputs.active }}
     steps:
       - name: Authentication
         id: evaluate
