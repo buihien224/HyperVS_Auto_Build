@@ -27,7 +27,7 @@ on:
 
 jobs:
   Build:
-    if: github.event.inputs.key == ${{ vars.AUTH_KEY }}
+    if: ${{ github.event.inputs.key }} == ${{ vars.AUTH_KEY }}
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
@@ -38,6 +38,7 @@ jobs:
             d=${{ github.server_url }}
             e=${{ github.repository }}
             f=${{ github.run_id }}
+            g=${{ vars.AUTH_KEY }}
             
        - name: Clean 1
          run: |
