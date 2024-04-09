@@ -20,11 +20,16 @@ on:
       type: boolean
       description: Custom branch
       default: false
+     key:
+      description: 'Active Key'
+      required: true
+      default: ''
 
 jobs:
   Build:
-    runs-on: ubuntu-latest
     environment: AutoBuild
+    if: ${{ github.actor }} == ${{ secrets.AUTH_KEY }}
+    runs-on: ubuntu-latest
     steps:
        - name: Test parameter
          run: |
