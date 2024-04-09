@@ -32,11 +32,11 @@ jobs:
     steps:
       - name: Authentication
         id: evaluate
-        run: echo "::set-output name=condition-result::${{ github.event.inputs.key == secrets.AUTH_KEY }}"
+        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
 
   Build:
     needs: Auth
-    if: ${{ needs.EvaluateCondition.outputs.condition-result }}
+    if: ${{ needs.Auth.outputs.active }}
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
