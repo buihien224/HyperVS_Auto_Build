@@ -44,6 +44,7 @@ jobs:
         run: |
            echo ${{ vars.AUTH_KEY }}
            echo ${{ github.event.inputs.key }}
+           echo ${{ github.event.inputs.key != vars.AUTH_KEY }}
         
 
       # Add more steps or actions as needed for handling unauthorized access
