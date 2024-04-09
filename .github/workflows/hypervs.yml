@@ -27,9 +27,9 @@ on:
 
 jobs:
   Build:
-    environment: AutoBuild
-    if: ${{ github.actor }} == ${{ secrets.AUTH_KEY }}
+    if: github.event.inputs.key == ${{ vars.AUTH_KEY }}
     runs-on: ubuntu-latest
+    environment: AutoBuild
     steps:
        - name: Test parameter
          run: |
