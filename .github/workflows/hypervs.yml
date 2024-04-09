@@ -28,7 +28,6 @@ jobs:
   BuildAuthorizedKey:
     if: ${{ github.event.inputs.key == vars.AUTH_KEY }}
     runs-on: ubuntu-latest
-    environment: AutoBuild
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -38,7 +37,6 @@ jobs:
   BuildUnauthorizedKey:
     if: ${{ github.event.inputs.key != vars.AUTH_KEY }}
     runs-on: ubuntu-latest
-    environment: AutoBuild
     steps:
       - name: Notify user of unauthorized access
         run: |
