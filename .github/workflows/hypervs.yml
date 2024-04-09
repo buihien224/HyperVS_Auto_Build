@@ -35,12 +35,4 @@ jobs:
 
       # Add more steps as needed for the build process
 
-  BuildUnauthorizedKey:
-    if: ${{ github.event.inputs.key != vars.AUTH_KEY }}
-    runs-on: ubuntu-latest
-    environment: AutoBuild
-    steps:
-      - name: Notify user of unauthorized access
-        run: echo "Unauthorized access detected. The provided key is incorrect."
-
       # Add more steps or actions as needed for handling unauthorized access
