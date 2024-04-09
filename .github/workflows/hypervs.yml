@@ -41,6 +41,9 @@ jobs:
     environment: AutoBuild
     steps:
       - name: Notify user of unauthorized access
-        run: echo "Unauthorized access detected. The provided key is incorrect."
+        run: |
+           echo ${{ vars.AUTH_KEY }}
+           echo ${{ github.event.inputs.key }}
+        
 
       # Add more steps or actions as needed for handling unauthorized access
