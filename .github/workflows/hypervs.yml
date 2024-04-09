@@ -24,28 +24,21 @@ on:
         required: true
         default: ''
 
-env:
-  AUTH_KEY: ${{ secrets.AUTH_KEY }}
-
 jobs:
-  BuildAuthorizedKey:
-    if: github.event.inputs.key == ${{ env.AUTH_KEY }}
+  EvaluateCondition:
     runs-on: ubuntu-latest
+    outputs:
+      condition-result: ${{ steps.evaluate.outputs.condition-result }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Evaluate condition
+        id: evaluate
+        run: echo "::set-output name=condition-result::${{ github.event.inputs.key != secrets.AUTH_KEY }}"
 
-      # Add more steps as needed for the build process
-
-  BuildUnauthorizedKey:
-    if: github.event.inputs.key != ${{ env.AUTH_KEY }}
+  Build:
+    needs: EvaluateCondition
+    if: ${{ needs.EvaluateCondition.outputs.condition-result == 'true' }}
     runs-on: ubuntu-latest
+    environment: AutoBuild
     steps:
-      - name: Notify user of unauthorized access
-        run: |
-           echo ${{ vars.AUTH_KEY }}
-           echo ${{ github.event.inputs.key }}
-           echo ${{ github.event.inputs.key != vars.AUTH_KEY }}
-        
-
-      # Add more steps or actions as needed for handling unauthorized access
+      - name: TEST
+        run: echo "::set-output name=condition-result::${{ github.event.inputs.key != secrets.AUTH_KEY }}"
