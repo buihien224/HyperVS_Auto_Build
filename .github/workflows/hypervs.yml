@@ -26,9 +26,9 @@ on:
 
 jobs:
   BuildAuthorizedKey:
-    if: ${{ github.event.inputs.key == secrets.AUTH_KEY }}
-    runs-on: ubuntu-latest
     environment: AutoBuild
+    if: ${{ github.event.inputs.key == vars.AUTH_KEY }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
