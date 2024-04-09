@@ -36,7 +36,7 @@ jobs:
 
   Build:
     needs: Auth
-    if: ${{ needs.EvaluateCondition.outputs.condition-result == 'true' }}
+    if: ${{ needs.EvaluateCondition.outputs.condition-result }}
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
