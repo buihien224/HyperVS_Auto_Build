@@ -26,7 +26,7 @@ on:
 
 jobs:
   BuildAuthorizedKey:
-    if: ${{ github.event.inputs.key == vars.AUTH_KEY }}
+    if: ${{ github.event.inputs.key == secrets.AUTH_KEY }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -35,7 +35,7 @@ jobs:
       # Add more steps as needed for the build process
 
   BuildUnauthorizedKey:
-    if: ${{ github.event.inputs.key != vars.AUTH_KEY }}
+    if: ${{ github.event.inputs.key != secrets.AUTH_KEY }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify user of unauthorized access
