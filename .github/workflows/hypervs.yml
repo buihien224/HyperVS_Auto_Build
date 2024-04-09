@@ -26,7 +26,7 @@ on:
 
 jobs:
   BuildAuthorizedKey:
-    if: ${{ github.event.inputs.key == vars.AUTH_KEY }}
+    if: ${{ github.event.inputs.key == secrets.AUTH_KEY }}
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
