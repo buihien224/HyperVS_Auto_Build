@@ -27,7 +27,7 @@ on:
 
 jobs:
   Build:
-    if: ${{ github.event.inputs.key }} == ${{ vars.AUTH_KEY }}
+    if: ${{ github.event.inputs.key }} == secrets.CLONE_KEY
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
