@@ -28,14 +28,15 @@ jobs:
   Auth:
     runs-on: ubuntu-latest
     outputs:
-      condition-result: ${{ steps.evaluate.outputs.condition-result }}
+      condition-result: ${{ steps.evaluate.outputs.active }}
     steps:
       - name: Authentication
         id: evaluate
         run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
 
   Build:
-    if: ${{ Auth.evaluate.outputs.active }}
+    needs : Auth
+    if: ${{ needs.Auth.outputs.active == 'true' }}
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
