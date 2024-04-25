@@ -23,6 +23,10 @@ on:
         description: 'Active Key'
         required: true
         default: ''
+      trigger:
+        description: 'Trigger name'
+        required: true
+        default: 'Auto_Build'
 
 jobs:
   Auth:
@@ -93,7 +97,7 @@ jobs:
 
        - name: Download ROM
          run: |
-            ./bhlnk -i "Auto_Buid" ${{ github.event.inputs.ROM_URL }} ${{ github.event.inputs.vip }} ${{ github.event.inputs.stock }} ${{ github.event.inputs.custom }}
+            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }} ${{ github.event.inputs.vip }} ${{ github.event.inputs.stock }} ${{ github.event.inputs.custom }}
             ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             axel --insecure -n $(nproc) ${{ github.event.inputs.ROM_URL }}
 
