@@ -42,6 +42,14 @@ jobs:
     outputs:
       active: ${{ steps.evaluate.outputs.active }}
     steps:
+      - name: Test parameter
+        run: |
+          a=${{ github.event.inputs.ROM_URL }}
+          c=${{ github.event.inputs.trigger }}
+          d=${{ github.event.inputs.key }}
+          e=${{ github.event.inputs.disnotification }}
+          f=${{ github.event.inputs.corepatch }}
+        
       - name: Authentication
         id: evaluate
         run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_ENV
