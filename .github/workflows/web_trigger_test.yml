@@ -69,10 +69,9 @@ jobs:
       - name: Test parameter
         run: |
           a=${{ github.event.inputs.ROM_URL }}
-          c=${{ github.actor }}
-          d=${{ github.server_url }}
-          e=${{ github.repository }}
-          f=${{ github.run_id }}
+          a=${{ github.event.inputs.corepatch }}
+          a=${{ github.event.inputs.disnotification }}
+
 
       - name: Clean 1
         run: |
