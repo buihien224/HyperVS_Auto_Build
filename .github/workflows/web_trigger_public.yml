@@ -38,9 +38,23 @@ jobs:
     outputs:
       active: ${{ steps.evaluate.outputs.active }}
     steps:
+      - name: Test parameter
+        run: |
+          echo "ROM_URL=${{ github.event.inputs.ROM_URL }}"
+          echo "Trigger=${{ github.event.inputs.trigger }}"
+          echo "Key=${{ github.event.inputs.key }}"
+          echo "Disable Notification=${{ github.event.inputs.disnotification }}"
+          echo "CorePatch=${{ github.event.inputs.corepatch }}"
+
       - name: Authentication
         id: evaluate
-        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_ENV
+        run: |
+          echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_ENV
+          echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}"
+          echo "::set-output name=active::${{ github.event.inputs.key == secrets.AUTH_KEY }}"
+
+      - name: Debug Auth Output
+        run: echo "Active=${{ steps.evaluate.outputs.active }}"
 
   Build:
     needs: Auth
