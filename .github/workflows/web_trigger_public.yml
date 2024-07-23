@@ -114,7 +114,7 @@ jobs:
           ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }} ${{ github.event.inputs.vip }} ${{ github.event.inputs.stock }} ${{ github.event.inputs.custom }} false
   
       - name: Download ROM - Send Notification
-        if: ${{ github.event.inputs.disnotification == false }}
+        if: ${{ github.event.inputs.disnotification == 'false' }}
         run: |
             ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
@@ -127,7 +127,7 @@ jobs:
           sudo chmod 777 -R *
 
       - name: Download vsstuff - Send Notification
-        if: ${{ github.event.inputs.disnotification == false }}
+        if: ${{ github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
@@ -136,7 +136,7 @@ jobs:
           ./bhlnk -s
 
       - name: Extract state - Send Notification
-        if: ${{ github.event.inputs.disnotification == false }}
+        if: ${{ github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 3 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
@@ -145,7 +145,7 @@ jobs:
           ./bhlnk -p extract
 
       - name: Patch ROM with MIUIVS mod - Send Notification
-        if: ${{ github.event.inputs.disnotification == false }}
+        if: ${{ github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 4 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
@@ -154,7 +154,7 @@ jobs:
           ./bhlnk -p patchvs
 
       - name: Re-create partition - Send Notification
-        if: ${{ github.event.inputs.disnotification == false }}
+        if: ${{ github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 5 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
@@ -163,7 +163,7 @@ jobs:
           ./bhlnk -p pack
 
       - name: Upload ROM - Send Notification
-        if: ${{ github.event.inputs.disnotification == false }}
+        if: ${{ github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 6 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
@@ -172,16 +172,16 @@ jobs:
           ./bhlnk -u
 
       - name: Push Notification to Telegram
-        if: ${{ github.event.inputs.disnotification == false }}
+        if: ${{ github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 0 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
       - name: The job has cancelled - Send Notification
-        if: ${{ cancelled() && github.event.inputs.disnotification == false }}
+        if: ${{ cancelled() && github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
 
       - name: The job has failed - Send Notification
-        if: ${{ failure() && github.event.inputs.disnotification == false }}
+        if: ${{ failure() && github.event.inputs.disnotification == 'false' }}
         run: |
           ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
