@@ -1,4 +1,4 @@
-name: HyperVS_Auto_Build
+name: web_trigger_public
 
 on:
   workflow_dispatch:
