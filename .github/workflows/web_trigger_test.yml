@@ -49,6 +49,7 @@ jobs:
           d=${{ github.event.inputs.key }}
           e=${{ github.event.inputs.disnotification }}
           f=${{ github.event.inputs.corepatch }}
+          g=${{ github.event.inputs.key == secrets.AUTH_KEY }}"
         
       - name: Authentication
         id: evaluate
