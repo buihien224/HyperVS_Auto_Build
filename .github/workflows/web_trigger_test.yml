@@ -157,7 +157,7 @@ jobs:
 
       - name: Patch ROM with MIUIVS mod - Run Command
         run: |
-          ./bhlnk -p patchvs
+          ./bhlnk -p patchvs ${{ github.event.inputs.corepatch }}
 
       - name: Re-create partition - Send Notification
         if: ${{ ! github.event.inputs.disnotification }}
@@ -166,7 +166,7 @@ jobs:
 
       - name: Re-create partition - Run Command
         run: |
-          ./bhlnk -p pack
+          ./bhlnk -p pack 
 
       - name: Upload ROM - Send Notification
         if: ${{ ! github.event.inputs.disnotification }}
