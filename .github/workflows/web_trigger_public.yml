@@ -44,7 +44,6 @@ jobs:
           echo "Trigger=${{ github.event.inputs.trigger }}"
           echo "Key=${{ github.event.inputs.key }}"
           echo "Disable Notification=${{ github.event.inputs.disnotification }}"
-          echo "CorePatch=${{ github.event.inputs.corepatch }}"
 
       - name: Authentication
         id: evaluate
