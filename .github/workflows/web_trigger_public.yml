@@ -48,9 +48,9 @@ jobs:
       - name: Authentication
         id: evaluate
         run: |
-          echo "active=${{ github.event.inputs.key == secrets.WEB_AUTH_KEY }}" >> $GITHUB_ENV
-          echo "active=${{ github.event.inputs.key == secrets.WEB_AUTH_KEY }}"
-          echo "::set-output name=active::${{ github.event.inputs.key == secrets.WEB_AUTH_KEY }}"
+          echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_ENV
+          echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}"
+          echo "::set-output name=active::${{ github.event.inputs.key == secrets.AUTH_KEY }}"
 
       - name: Debug Auth Output
         run: echo "Active=${{ steps.evaluate.outputs.active }}"
