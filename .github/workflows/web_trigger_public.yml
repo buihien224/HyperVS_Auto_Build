@@ -7,7 +7,6 @@ on:
         description: 'OTA Url'
         required: false
         default: ''
-
       key:
         description: 'Active Key'
         required: true
