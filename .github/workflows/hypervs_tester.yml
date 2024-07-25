@@ -7,10 +7,7 @@ on:
         description: 'OTA Url'
         required: false
         default: ''
-      vip:
-        type: boolean
-        description: Vietsub Pro
-        default: true
+
       key:
         description: 'Active Key'
         required: true
@@ -90,7 +87,7 @@ jobs:
 
        - name: Download ROM
          run: |
-            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }} ${{ github.event.inputs.vip }} }
+            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }} }
             ./bhlnk -p notification_t ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             axel --insecure -n $(nproc) ${{ github.event.inputs.ROM_URL }}
 

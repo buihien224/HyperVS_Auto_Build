@@ -7,10 +7,7 @@ on:
         description: 'OTA Url'
         required: false
         default: ''
-      vip:
-        type: boolean
-        description: Vietsub Pro
-        default: true
+
       key:
         description: 'Active Key'
         required: true
@@ -104,7 +101,7 @@ jobs:
 
       - name: Init Rom config
         run: |
-          ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }} ${{ github.event.inputs.vip }} } false
+          ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }} } false
   
       - name: Download ROM - Send Notification
         if: ${{ github.event.inputs.disnotification == 'false' }}
