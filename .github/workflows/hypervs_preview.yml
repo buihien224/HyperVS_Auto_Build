@@ -114,10 +114,12 @@ jobs:
             ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 5 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             ./bhlnk -p pack 
 
-       - name : Upload ROM
+       - name: Upload
          run: |
             ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 6 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            ./bhlnk -u 
+            ./bhlnk -u || exit 0  # Continue if not 0
+            echo "Upload returned 0. Exiting workflow."
+            exit 1
 
        - name : Push Notification to Telegram
          run: |
