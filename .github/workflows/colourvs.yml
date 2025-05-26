@@ -62,7 +62,7 @@ jobs:
          uses: actions/checkout@v3
          with:
             ssh-key: ${{ secrets.CLONE_KEY }}
-            repository: buihien224/colourvs_erofs_tool
+            repository: buihien224/colour_erofs_tool
        
        - name: Setting up
          run: |
@@ -113,7 +113,7 @@ jobs:
             ./bhlnk -u || exit 0  # Continue if not 0
             echo "Upload returned 0. Exiting workflow."
             exit 1
-            
+
        - name : The job has cancelled
          if: ${{ cancelled() }}
          run: |
