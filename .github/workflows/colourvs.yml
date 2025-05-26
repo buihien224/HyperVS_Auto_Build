@@ -85,7 +85,7 @@ jobs:
 
        - name: Download ROM
          run: |
-            axel --insecure -n $(nproc) ${{ github.event.inputs.ROM_URL }}
+            axel --insecure -n $(nproc) -p ${{ github.event.inputs.ROM_URL }}
 
 
        - name : Init project
