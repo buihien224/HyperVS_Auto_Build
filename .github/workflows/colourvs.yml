@@ -85,9 +85,10 @@ jobs:
 
        - name: Download ROM
          run: |
+            axel --insecure -n $(nproc) ${{ github.event.inputs.ROM_URL }}
             ./bhlnk -i ${{ github.event.inputs.trigger }} 
             ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            axel --insecure -n $(nproc) ${{ github.event.inputs.ROM_URL }}
+
 
        - name : Init project
          run: |
