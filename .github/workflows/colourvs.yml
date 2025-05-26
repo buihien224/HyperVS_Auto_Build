@@ -52,7 +52,7 @@ jobs:
        - name: Clean 2
          uses: easimon/maximize-build-space@master
          with:
-            root-reserve-mb: 512
+            root-reserve-mb: 512C
             swap-size-mb: 1024
             remove-dotnet: "true"
             remove-android: "true"
@@ -61,7 +61,7 @@ jobs:
        - name: Checkout
          uses: actions/checkout@v3
          with:
-            ssh-key: ${{ secrets.CLONE_KEY }}
+            ssh-key: ${{ secrets.CLONEC_KEY }}
             repository: buihien224/colour_erofs_tool
        
        - name: Setting up
