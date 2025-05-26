@@ -3,9 +3,9 @@ name: bot_trigger_public
 on:
   workflow_dispatch:
     inputs:
-      code:
-        description: 'ID GoogleDrive'
-        required: true
+      ROM_URL:
+        description: 'OTA Url'
+        required: false
         default: ''
       key:
         description: 'Active Key'
@@ -34,7 +34,7 @@ jobs:
     steps:
        - name: Test parameter
          run: |
-            a=${{ github.event.inputs.code }}
+            a=${{ github.event.inputs.ROM_URL }}
             c=${{ github.actor }}
             d=${{ github.server_url }}
             e=${{ github.repository }}
@@ -49,6 +49,14 @@ jobs:
             sudo apt -y autoclean || true
             sudo apt clean || true
 
+       - name: Clean 2
+         uses: easimon/maximize-build-space@master
+         with:
+            root-reserve-mb: 512
+            swap-size-mb: 1024
+            remove-dotnet: "true"
+            remove-android: "true"
+            remove-haskell: "true"
             
        - name: Checkout
          uses: actions/checkout@v3
@@ -62,7 +70,6 @@ jobs:
             sudo pip3 install ConfigObj
             sudo pip3 install firebase_admin
             sudo pip3 install telebot
-            sudo pip3 install gdown
           
             
        - name: Set up VIETSUB 
@@ -78,8 +85,9 @@ jobs:
 
        - name: Download ROM
          run: |
-            gdown https://drive.google.com/uc?id=${{ github.event.inputs.code }}
-            ./bhlnk -i ${{ github.event.inputs.trigger }} true true
+            ./bhlnk -i ${{ github.event.inputs.trigger }} 
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+            axel --insecure -n $(nproc) ${{ github.event.inputs.ROM_URL }}
 
        - name : Init project
          run: |
@@ -87,26 +95,35 @@ jobs:
 
        - name: Download vsstuff
          run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             ./bhlnk -s
 
        - name: Extract state
          run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 3 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             ./bhlnk -p extract         
 
-       - name: Patch Rom with VSTeam mod
+       - name: Patch Rom with MIUIVS mod
          run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 4 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             ./bhlnk -p patchvs
 
        - name: Re-create partition 
          run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 5 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             ./bhlnk -p pack 
 
        - name: Upload
          run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 6 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
             ./bhlnk -u || exit 0  # Continue if not 0
             echo "Upload returned 0. Exiting workflow."
             exit 1
 
+       - name : Push Notification to Telegram
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 0 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+       
        - name : The job has cancelled
          if: ${{ cancelled() }}
          run: |
