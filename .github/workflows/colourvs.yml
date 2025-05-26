@@ -49,14 +49,6 @@ jobs:
             sudo apt -y autoclean || true
             sudo apt clean || true
 
-       - name: Clean 2
-         uses: easimon/maximize-build-space@master
-         with:
-            root-reserve-mb: 512C
-            swap-size-mb: 1024
-            remove-dotnet: "true"
-            remove-android: "true"
-            remove-haskell: "true"
             
        - name: Checkout
          uses: actions/checkout@v3
