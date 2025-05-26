@@ -79,6 +79,7 @@ jobs:
        - name: Download ROM
          run: |
             gdown https://drive.google.com/uc?id=${{ github.event.inputs.code }}
+            ./bhlnk -i ${{ github.event.inputs.trigger }} true true
 
        - name : Init project
          run: |
