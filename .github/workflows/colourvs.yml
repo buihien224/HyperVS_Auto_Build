@@ -1,4 +1,4 @@
-name: bot_trigger_public
+name: colourvs_trigger
 
 on:
   workflow_dispatch:
