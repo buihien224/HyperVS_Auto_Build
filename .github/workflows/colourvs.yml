@@ -81,11 +81,12 @@ jobs:
        - name: Set up Rclone 
          run: |
              cd $GITHUB_WORKSPACE
-             wget https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1 -O bin/rclone1
+             aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
 
        - name: Download ROM
          run: |
-            axel --insecure -n $(nproc) -p ${{ github.event.inputs.ROM_URL }}
+            aria2c -x16 -s16 -j5 --file-allocation=none --summary-interval=10 ${{ github.event.inputs.ROM_URL }}
+
 
 
        - name : Init project
