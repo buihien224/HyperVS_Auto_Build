@@ -40,23 +40,6 @@ jobs:
             e=${{ github.repository }}
             f=${{ github.run_id }}
             
-       - name: Clean 1
-         run: |
-            docker rmi `docker images -q` || true
-            sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
-            sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
-            sudo apt -y autoremove --purge || true
-            sudo apt -y autoclean || true
-            sudo apt clean || true
-
-       - name: Clean 2
-         uses: easimon/maximize-build-space@master
-         with:
-            root-reserve-mb: 512
-            swap-size-mb: 1024
-            remove-dotnet: "true"
-            remove-android: "true"
-            remove-haskell: "true"
             
        - name: Checkout
          uses: actions/checkout@v3
