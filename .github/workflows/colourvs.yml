@@ -68,8 +68,6 @@ jobs:
          run: |
             sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler
             sudo pip3 install ConfigObj
-            sudo python3 -m pip install --upgrade --user --break-system-packages typing_extensions==4.15.0
-            sudo python3 -m pip install --upgrade --user --break-system-packages firebase_admin
             sudo pip3 install telebot
           
             
