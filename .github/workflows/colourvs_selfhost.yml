@@ -52,7 +52,6 @@ jobs:
          run: |
             sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
             sudo pip3 install ConfigObj
-            sudo pip3 install firebase_admin
             sudo pip3 install telebot
           
             
