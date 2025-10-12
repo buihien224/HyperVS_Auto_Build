@@ -93,7 +93,11 @@ jobs:
 
        - name: Extract state
          run: |
-            ./bhlnk -p extract         
+            ./bhlnk -p extract    
+
+       - name: Patch VS
+         run: |
+            ./bhlnk -p patchvs      
 
        - name: Re-create partition 
          run: |
