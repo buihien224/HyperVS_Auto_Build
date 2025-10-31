@@ -1,0 +1,176 @@
+name: colourvs_testbuild
+
+on:
+  workflow_dispatch:
+    inputs:
+      ROM_URL:
+        description: 'Select device code (prefix of ROM filename)'
+        required: true
+        default: 'PKG110'
+        type: choice
+        options:
+          - PJF110
+          - PJZ110
+          - PKG110
+          - PKR110
+          - PKX110
+          - PJE110
+          - PJX110
+          - PJD110
+          - RMX5010
+          - RMX3800
+          - RMX5060
+          - RMX5062
+          - RMX5080
+          - RMX5090
+          - RMX3820
+          - RMX3888
+          - RMX6688
+          - PLF110
+          - PLC110
+          - OPD2413
+          - OPD2404
+          - PKT110
+          - PKC110
+          - PLB110
+          - RMX5071
+          - PLK110
+      key:
+        description: 'Active Key'
+        required: true
+        default: ''
+      trigger:
+        description: 'Trigger name'
+        required: true
+        default: 'TestBuild'
+
+jobs:
+  Auth:
+    runs-on: ubuntu-latest
+    outputs:
+      active: ${{ steps.evaluate.outputs.active }}
+    steps:
+      - name: Authentication
+        id: evaluate
+        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
+
+  Build:
+    needs: Auth
+    if: ${{ needs.Auth.outputs.active == 'true' }}
+    runs-on: ubuntu-latest
+    environment: AutoBuild
+    steps:
+       - name: Test parameter
+         run: |
+            a=${{ github.event.inputs.ROM_URL }}
+            c=${{ github.actor }}
+            d=${{ github.server_url }}
+            e=${{ github.repository }}
+            f=${{ github.run_id }}
+
+       - name: Clean 1
+         run: |
+            docker rmi `docker images -q` || true
+            sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
+            sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
+            sudo apt -y autoremove --purge || true
+            sudo apt -y autoclean || true
+            sudo apt clean || true
+
+       - name: Clean 2
+         uses: easimon/maximize-build-space@master
+         with:
+            root-reserve-mb: 512
+            swap-size-mb: 1024
+            remove-dotnet: "true"
+            remove-android: "true"
+            remove-haskell: "true"
+
+       - name: Checkout
+         uses: actions/checkout@v3
+         with:
+            ref: PREVIEW
+            ssh-key: ${{ secrets.CLONEC_KEY }}
+            repository: buihien224/colour_erofs_tool
+
+       - name: Setting up
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
+            sudo pip3 install ConfigObj
+            sudo pip3 install telebot
+
+       - name: Set up VIETSUB
+         run: |
+            cd "$GITHUB_WORKSPACE"
+            echo "Setting Vietnam timezone"
+            sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+
+       - name: Set up Rclone
+         run: |
+            cd "$GITHUB_WORKSPACE"
+            mkdir -p bin
+            aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+            chmod +x bin/rclone1
+
+       - name: Download ROM (rclone from gdrive1:/VS_Stock)
+         run: |
+            set -e
+            ROM="${{ github.event.inputs.ROM_URL }}"
+            echo "Searching in gdrive1:/VS_Stock for files starting with: ${ROM}"
+            FILE="$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include "${ROM}*" | head -n1)"
+            if [ -z "$FILE" ]; then
+              echo "❌ No file found starting with '${ROM}' in gdrive1:/VS_Stock"
+              exit 1
+            fi
+            echo "✅ Found: $FILE"
+            ./bin/rclone1 --config bin/lsc.conf copy "gdrive1:/VS_Stock/$FILE" .
+            echo "Downloaded:"
+            ls -lh
+
+       - name: Init project
+         run: |
+            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }}
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+            sudo chmod 777 -R *
+
+       - name: Download vsstuff
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+            ./bhlnk -s
+
+       - name: Extract state
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 3 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+            ./bhlnk -p extract
+
+       - name: Patch Rom with MIUIVS mod
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 4 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+            ./bhlnk -p patchvs
+
+       - name: Re-create partition
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 5 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+            ./bhlnk -p pack
+
+       - name: Upload
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 6 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+            ./bhlnk -u || exit 0  # Continue if not 0
+            echo "Upload returned 0. Exiting workflow."
+            exit 1
+
+       - name: Push Notification to Telegram
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 0 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+       - name: The job has cancelled
+         if: ${{ cancelled() }}
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+       - name: The job has failed
+         if: ${{ failure() }}
+         run: |
+            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
