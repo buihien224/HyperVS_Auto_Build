@@ -35,6 +35,7 @@ on:
           - PLB110
           - RMX5071
           - PLK110
+          - PLQ110
       key:
         description: 'Active Key'
         required: true
