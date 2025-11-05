@@ -9,33 +9,35 @@ on:
         default: 'PKG110'
         type: choice
         options:
-          - PJF110
-          - PJZ110
-          - PKG110
-          - PKR110
-          - PKX110
-          - PJE110
-          - PJX110
-          - PJD110
-          - RMX5010
-          - RMX3800
-          - RMX5060
-          - RMX5062
-          - RMX5080
-          - RMX5090
-          - RMX3820
-          - RMX3888
-          - RMX6688
-          - PLF110
-          - PLC110
-          - OPD2413
-          - OPD2404
-          - PKT110
-          - PKC110
-          - PLB110
-          - RMX5071
-          - PLK110
-          - PLQ110
+                - PLK110 # ONEPLUS 15
+                - PLQ110 # ONEPLUS ACE 6
+                - PJZ110 # ONEPLUS 13
+                - PKX110 # ONEPLUS 13T
+                - PKG110 # ONEPLUS ACE 5
+                - PKR110 # ONEPLUS ACE 5 PRO
+                - PLF110 # ONEPLUS ACE 5 RACING
+                - PLC110 # ONEPLUS ACE 5 ULTRA
+                - PJE110 # ONEPLUS ACE 3
+                - PJX110 # ONEPLUS ACE 3 PRO
+                - PJF110 # ONEPLUS ACE 3V
+                - PJD110 # ONEPLUS 12
+                - OPD2413 # ONEPLUS PAD 2 PRO
+                - OPD2404 # Oneplus Pad Pro
+                - RMX6699 # REALME GT8
+                - RMX5200 # REALME GT8 Pro
+                - RMX5010 # REALME GT7 PRO
+                - RMX5090 # REALME GT7 PRO RACING
+                - RMX6688 # REALME GT7
+                - RMX3800 # REALME GT6
+                - RMX3888 # REALME GT5 PRO
+                - RMX5060 # REALME NEO 7
+                - RMX5062 # REALME NEO7 TURBO
+                - RMX5080 # REALME NEO7 SE
+                - RMX5071 # REALME NEO7X
+                - PKT110 # OPPO FIND X8S
+                - PKC110 # Oppo Find X8 Pro
+                - PKB110 # Oppo Find X8
+                - PLB110 # OPPO FIND X8S PLUS
       key:
         description: 'Active Key'
         required: true
