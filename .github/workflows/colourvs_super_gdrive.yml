@@ -147,15 +147,13 @@ jobs:
         - name: Re-create partition 
           run: |
             ./bhlnk -p pack 
-        - name: Set up Rclone 
+        - name: Set up Rclone
           run: |
-              cd $GITHUB_WORKSPACE
-              
-              echo "Removing old rclone binary"
-              rm -f bin/rclone1
-              
-              echo "Downloading new rclone binary..."
-              aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+            cd $GITHUB_WORKSPACE
+            mkdir -p bin
+            rm -f bin/rclone1
+            aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+            chmod +x bin/rclone1
 
         - name: Upload
           run: |
