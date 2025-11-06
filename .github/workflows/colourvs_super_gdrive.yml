@@ -133,7 +133,7 @@ jobs:
 
         - name : Init project
           run: |          
-            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }}
+            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }} true
             sudo chmod 777 -R *
 
         - name: Extract state
