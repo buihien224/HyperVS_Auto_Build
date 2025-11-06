@@ -1,0 +1,162 @@
+name: coloros_super_create2
+
+on:
+  workflow_dispatch:
+    inputs:
+      ### THAY ĐỔI 1: Thay thế ROM_URL bằng danh sách choice ###
+      ROM_URL:
+        description: 'Select device code (prefix of ROM filename)'
+        required: true
+        default: 'PKG110'
+        type: choice
+        options:
+          - PLK110 # ONEPLUS 15
+          - PLQ110 # ONEPLUS ACE 6
+          - PJZ110 # ONEPLUS 13
+          - PKX110 # ONEPLUS 13T
+          - PKG110 # ONEPLUS ACE 5
+          - PKR110 # ONEPLUS ACE 5 PRO
+          - PLF110 # ONEPLUS ACE 5 RACING
+          - PLC110 # ONEPLUS ACE 5 ULTRA
+          - PJE110 # ONEPLUS ACE 3
+          - PJX110 # ONEPLUS ACE 3 PRO
+          - PJF110 # ONEPLUS ACE 3V
+          - PJD110 # ONEPLUS 12
+          - OPD2413 # ONEPLUS PAD 2 PRO
+          - OPD2404 # Oneplus Pad Pro
+          - RMX6699 # REALME GT8
+          - RMX5200 # REALME GT8 Pro
+          - RMX5010 # REALME GT7 PRO
+          - RMX5090 # REALME GT7 PRO RACING
+          - RMX6688 # REALME GT7
+          - RMX3800 # REALME GT6
+          - RMX3888 # REALME GT5 PRO
+          - RMX5060 # REALME NEO 7
+          - RMX5062 # REALME NEO7 TURBO
+          - RMX5080 # REALME NEO7 SE
+          - RMX5071 # REALME NEO7X
+          - PKT110 # OPPO FIND X8S
+          - PKC110 # Oppo Find X8 Pro
+          - PKB110 # Oppo Find X8
+          - PLB110 # OPPO FIND X8S PLUS
+      key:
+        description: 'Active Key'
+        required: true
+        default: ''
+      trigger:
+        description: 'Trigger name'
+        required: true
+        default: 'Auto_Build'
+
+jobs:
+  Auth:
+    runs-on: ubuntu-latest
+    outputs:
+      active: ${{ steps.evaluate.outputs.active }}
+    steps:
+      - name: Authentication
+        id: evaluate
+        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
+
+  Build:
+    needs : Auth
+    if: ${{ needs.Auth.outputs.active == 'true' }}
+    runs-on: ubuntu-latest
+    environment: AutoBuild
+    steps:
+        - name: Test parameter
+          run: |
+            a=${{ github.event.inputs.ROM_URL }}
+            c=${{ github.actor }}
+            d=${{ github.server_url }}
+            e=${{ github.repository }}
+            f=${{ github.run_id }}
+            
+        - name: Clean 1
+          run: |
+            docker rmi `docker images -q` || true
+            sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
+            sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
+            sudo apt -y autoremove --purge || true
+            sudo apt -y autoclean || true
+            sudo apt clean || true
+
+        - name: Clean 2
+          uses: easimon/maximize-build-space@master
+          with:
+            root-reserve-mb: 512
+            swap-size-mb: 1024
+            remove-dotnet: "true"
+            remove-android: "true"
+            remove-haskell: "true"
+            
+        - name: Checkout
+          uses: actions/checkout@v3
+          with:
+            ref: PREVIEW
+            ssh-key: ${{ secrets.CLONEC_KEY }}
+            repository: buihien224/colour_erofs_tool
+        
+        - name: Setting up
+          run: |
+            sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
+            sudo pip3 install ConfigObj
+            sudo pip3 install telebot
+            
+            
+        - name: Set up VIETSUB 
+          run: |
+            cd $GITHUB_WORKSPACE
+            echo "Setting Viename timezone"
+            sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+            
+        - name: Set up Rclone 
+          run: |
+             cd "$GITHUB_WORKSPACE"
+             mkdir -p bin
+             aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+             chmod +x bin/rclone1
+
+        - name: Create rclone config
+          run: |
+            echo "${{ secrets.RCLONE_CONF }}" > $GITHUB_WORKSPACE/bin/lsc.conf
+          env:
+            RCLONE_CONF: ${{ secrets.RCLONE_CONF }} # Đảm bảo ông đã thêm secret này vào repo
+
+        - name: Download ROM (rclone from gdrive1:/VS_Stock)
+          run: |
+            set -e
+            ROM="${{ github.event.inputs.ROM_URL }}"
+            echo "Searching in gdrive1:/VS_Stock for files starting with: ${ROM}"
+            FILE="$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include "${ROM}*" | head -n1)"
+            if [ -z "$FILE" ]; then
+              echo "❌ No file found starting with '${ROM}' in gdrive1:/VS_Stock"
+              exit 1
+            fi
+            echo "✅ Found: $FILE"
+            ./bin/rclone1 --config bin/lsc.conf copy "gdrive1:/VS_Stock/$FILE" .
+            echo "Downloaded:"
+            ls -lh
+
+        - name : Init project
+          run: |          
+            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }}
+            sudo chmod 777 -R *
+
+        - name: Extract state
+          run: |
+            ./bhlnk -p extract    
+
+        - name: Patch VS
+          run: |
+            ./bhlnk -p patchvs     
+
+        - name: Re-create partition 
+          run: |
+            ./bhlnk -p pack 
+
+        - name: Upload
+          run: |
+            ./bhlnk -u || exit 0  # Continue if not 0
+            echo "Upload returned 0. Exiting workflow."
+            exit 1
