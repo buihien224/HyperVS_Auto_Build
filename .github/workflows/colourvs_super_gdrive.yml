@@ -3,7 +3,6 @@ name: coloros_super_create2
 on:
   workflow_dispatch:
     inputs:
-      ### THAY ĐỔI 1: Thay thế ROM_URL bằng danh sách choice ###
       ROM_URL:
         description: 'Select device code (prefix of ROM filename)'
         required: true
@@ -110,18 +109,12 @@ jobs:
             echo "Setting Viename timezone"
             sudo timedatectl set-timezone Asia/Ho_Chi_Minh
             
-        - name: Set up Rclone 
+        - name: Set up Rclone
           run: |
-             cd "$GITHUB_WORKSPACE"
-             mkdir -p bin
-             aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
-             chmod +x bin/rclone1
-
-        - name: Create rclone config
-          run: |
-            echo "${{ secrets.RCLONE_CONF }}" > $GITHUB_WORKSPACE/bin/lsc.conf
-          env:
-            RCLONE_CONF: ${{ secrets.RCLONE_CONF }} # Đảm bảo ông đã thêm secret này vào repo
+            cd "$GITHUB_WORKSPACE"
+            mkdir -p bin
+            aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+            chmod +x bin/rclone1
 
         - name: Download ROM (rclone from gdrive1:/VS_Stock)
           run: |
