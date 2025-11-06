@@ -1,4 +1,4 @@
-name: colourvs_testbuild
+name: colourvs_stablebuild
 
 on:
   workflow_dispatch:
