@@ -125,46 +125,46 @@ jobs:
 
       - name: Download ROM
         run: |
-          set -e          
+          set -e
           OPTION="${{ github.event.inputs.ROM_URL }}"
-          CUSTOM="${{ github.event.inputs.CUSTOM_URL }}"          
+          CUSTOM="${{ github.event.inputs.CUSTOM_URL }}"
           if [ "$OPTION" == "Custom" ]; then
-             if [ -z "$CUSTOM" ]; then
-                echo "❌ Error: You selected 'Custom' but did not paste a link/prefix in the 'CUSTOM_URL' box!"
-                exit 1
-             fi
-             INPUT="$CUSTOM"
-             echo "ℹ️ Mode: Custom Input selected."
+            if [ -z "$CUSTOM" ]; then
+               echo "❌ Error: You selected 'Custom' but did not paste a link/prefix in the 'CUSTOM_URL' box!"
+               exit 1
+            fi
+            INPUT="$CUSTOM"
+            echo "ℹ️ Mode: Custom Input selected."
           else
-             INPUT="$OPTION"
-             echo "ℹ️ Mode: Preset Device selected ($OPTION)."
+            INPUT="$OPTION"
+            echo "ℹ️ Mode: Preset Device selected ($OPTION)."
           fi
-          LENGTH=${#INPUT}          
+          LENGTH=${#INPUT}            
           if [ "$LENGTH" -gt 10 ]; then
             echo "Input length: $LENGTH (>10). Detected Direct URL."
             echo "🚀 Starting high-speed download with aria2..."
-            aria2c -x16 -s16 -k1M --check-certificate=false "$INPUT"            
+            aria2c -x16 -s16 -k1M --check-certificate=false "$INPUT"              
           else
-            echo "Input length: $LENGTH (<=10). Detected Filename Prefix."            
-            echo "🔍 Searching in gdrive1:/VS_Stock for prefix: ${INPUT}..."
-            FILE="$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include "${INPUT}*" | head -n1)"            
+            echo "Input length: $LENGTH (<=10). Detected Filename Prefix."              
+            echo "🔍 Searching in 1drive1:/Mirror for prefix: ${INPUT}..."
+            FILE="$(./bin/rclone1 --config bin/lsc.conf lsf '1drive1:/Mirror' --files-only --include "${INPUT}*" | head -n1)"
             if [ -n "$FILE" ]; then
-              echo "✅ Found in GDrive: $FILE"
-              SOURCE_PATH="gdrive1:/VS_Stock"
+              echo "✅ Found in OneDrive: $FILE"
+              SOURCE_PATH="1drive1:/Mirror"
             else
-              echo "⚠️ Not found in GDrive. Searching in 1drive1:/Mirror..."
-              FILE="$(./bin/rclone1 --config bin/lsc.conf lsf '1drive1:/Mirror' --files-only --include "${INPUT}*" | head -n1)"
+              echo "⚠️ Not found in OneDrive. Searching in gdrive1:/VS_Stock..."
+              FILE="$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include "${INPUT}*" | head -n1)"
               if [ -n "$FILE" ]; then
-                 echo "✅ Found in OneDrive: $FILE"
-                 SOURCE_PATH="1drive1:/Mirror"
+                echo "✅ Found in GDrive: $FILE"
+                SOURCE_PATH="gdrive1:/VS_Stock"
               fi
             fi
             if [ -z "$FILE" ]; then
-              echo "❌ Error: No file found starting with '${INPUT}' in both GDrive and OneDrive!"
+              echo "❌ Error: No file found starting with '${INPUT}' in both OneDrive and GDrive!"
               exit 1
             fi
-            echo "⬇️ Downloading $FILE from $SOURCE_PATH..."
-            ./bin/rclone1 --config bin/lsc.conf copy "$SOURCE_PATH/$FILE" .
+            echo "⬇️ Downloading $FILE from $SOURCE_PATH with MAX SPEED..."
+            ./bin/rclone1 --config bin/lsc.conf copy "$SOURCE_PATH/$FILE" . --transfers=32 --checkers=32 --multi-thread-streams=32 --buffer-size=128M --drive-chunk-size=128M --progress
           fi
           echo "🎉 Download/Check process completed. Content:"
           ls -lh
