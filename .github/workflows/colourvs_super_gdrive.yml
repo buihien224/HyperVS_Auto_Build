@@ -179,7 +179,7 @@ jobs:
             ls -lh
 
       - name: Init project
-              run: |
+        run: |
                 OPTION="${{ github.event.inputs.ROM_URL }}"
                 CUSTOM="${{ github.event.inputs.CUSTOM_URL }}"
                 if [ "$OPTION" == "Custom" ]; then
