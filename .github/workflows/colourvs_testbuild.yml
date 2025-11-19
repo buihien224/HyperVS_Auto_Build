@@ -172,7 +172,8 @@ jobs:
                 --buffer-size=64M \
                 --drive-chunk-size=64M \
                 --ignore-checksum \
-                --no-update-mod-time \
+                --no-update-modtime \
+                --no-check-dest \
                 --progress
             fi
             echo "🎉 Download/Check process completed. Content:"
