@@ -1,43 +1,50 @@
-name: colourvs_testbuild
+name: coloros_test_build
 
 on:
   workflow_dispatch:
     inputs:
       ROM_URL:
-        description: 'Select device code (prefix of ROM filename)'
+        description: 'Select device code OR Select Custom'
         required: true
         default: 'PKG110'
-        type: choice
+        type: choice 
         options:
-                - PLK110 # ONEPLUS 15
-                - PLQ110 # ONEPLUS ACE 6
-                - PJZ110 # ONEPLUS 13
-                - PKX110 # ONEPLUS 13T
-                - PKG110 # ONEPLUS ACE 5
-                - PKR110 # ONEPLUS ACE 5 PRO
-                - PLF110 # ONEPLUS ACE 5 RACING
-                - PLC110 # ONEPLUS ACE 5 ULTRA
-                - PJE110 # ONEPLUS ACE 3
-                - PJX110 # ONEPLUS ACE 3 PRO
-                - PJF110 # ONEPLUS ACE 3V
-                - PJD110 # ONEPLUS 12
-                - OPD2413 # ONEPLUS PAD 2 PRO
-                - OPD2404 # Oneplus Pad Pro
-                - RMX6699 # REALME GT8
-                - RMX5200 # REALME GT8 Pro
-                - RMX5010 # REALME GT7 PRO
-                - RMX5090 # REALME GT7 PRO RACING
-                - RMX6688 # REALME GT7
-                - RMX3800 # REALME GT6
-                - RMX3888 # REALME GT5 PRO
-                - RMX5060 # REALME NEO 7
-                - RMX5062 # REALME NEO7 TURBO
-                - RMX5080 # REALME NEO7 SE
-                - RMX5071 # REALME NEO7X
-                - PKT110 # OPPO FIND X8S
-                - PKC110 # Oppo Find X8 Pro
-                - PKB110 # Oppo Find X8
-                - PLB110 # OPPO FIND X8S PLUS
+          - PLK110
+          - PLQ110
+          - PJZ110
+          - PKX110
+          - PKG110
+          - PKR110
+          - PLF110
+          - PLC110
+          - PJE110
+          - PJX110
+          - PJF110
+          - PJD110
+          - OPD2413
+          - OPD2404
+          - RMX6699
+          - RMX5200
+          - RMX5010
+          - RMX5090
+          - RMX6688
+          - RMX3800
+          - RMX3888
+          - RMX5060
+          - RMX5062
+          - RMX5080
+          - RMX5071
+          - PKT110
+          - PKC110
+          - PKB110
+          - PLB110
+          - Custom
+     
+      CUSTOM_URL:
+        description: 'Custom'
+        required: false
+        default: ''
+
       key:
         description: 'Active Key'
         required: true
@@ -45,7 +52,7 @@ on:
       trigger:
         description: 'Trigger name'
         required: true
-        default: 'TestBuild'
+        default: 'Auto_Build'
 
 jobs:
   Auth:
@@ -116,19 +123,50 @@ jobs:
             aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
             chmod +x bin/rclone1
 
-       - name: Download ROM (rclone from gdrive1:/VS_Stock)
+       - name: Download ROM
          run: |
             set -e
-            ROM="${{ github.event.inputs.ROM_URL }}"
-            echo "Searching in gdrive1:/VS_Stock for files starting with: ${ROM}"
-            FILE="$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include "${ROM}*" | head -n1)"
-            if [ -z "$FILE" ]; then
-              echo "❌ No file found starting with '${ROM}' in gdrive1:/VS_Stock"
-              exit 1
+            OPTION="${{ github.event.inputs.ROM_URL }}"
+            CUSTOM="${{ github.event.inputs.CUSTOM_URL }}"
+            if [ "$OPTION" == "Custom" ]; then
+              if [ -z "$CUSTOM" ]; then
+                  echo "❌ Error: You selected 'Custom' but did not paste a link/prefix in the 'CUSTOM_URL' box!"
+                  exit 1
+              fi
+              INPUT="$CUSTOM"
+              echo "ℹ️ Mode: Custom Input selected."
+            else
+              INPUT="$OPTION"
+              echo "ℹ️ Mode: Preset Device selected ($OPTION)."
             fi
-            echo "✅ Found: $FILE"
-            ./bin/rclone1 --config bin/lsc.conf copy "gdrive1:/VS_Stock/$FILE" .
-            echo "Downloaded:"
+            LENGTH=${#INPUT}            
+            if [ "$LENGTH" -gt 10 ]; then
+              echo "Input length: $LENGTH (>10). Detected Direct URL."
+              echo "🚀 Starting high-speed download with aria2..."
+              aria2c -x16 -s16 -k1M --check-certificate=false "$INPUT"              
+            else
+              echo "Input length: $LENGTH (<=10). Detected Filename Prefix."              
+              echo "🔍 Searching in gdrive1:/VS_Stock for prefix: ${INPUT}..."
+              FILE="$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include "${INPUT}*" | head -n1)"
+              if [ -n "$FILE" ]; then
+                echo "✅ Found in GDrive: $FILE"
+                SOURCE_PATH="gdrive1:/VS_Stock"
+              else
+                echo "⚠️ Not found in GDrive. Searching in 1drive1:/Mirror..."
+                FILE="$(./bin/rclone1 --config bin/lsc.conf lsf '1drive1:/Mirror' --files-only --include "${INPUT}*" | head -n1)"
+                if [ -n "$FILE" ]; then
+                  echo "✅ Found in OneDrive: $FILE"
+                  SOURCE_PATH="1drive1:/Mirror"
+                fi
+              fi
+              if [ -z "$FILE" ]; then
+                echo "❌ Error: No file found starting with '${INPUT}' in both GDrive and OneDrive!"
+                exit 1
+              fi
+              echo "⬇️ Downloading $FILE from $SOURCE_PATH..."
+              ./bin/rclone1 --config bin/lsc.conf copy "$SOURCE_PATH/$FILE" .
+            fi
+            echo "🎉 Download/Check process completed. Content:"
             ls -lh
 
        - name: Init project
