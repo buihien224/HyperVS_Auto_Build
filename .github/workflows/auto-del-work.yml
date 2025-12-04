@@ -1,4 +1,4 @@
-name: Delete All Workflow Runs
+name: Process Logs, Upload 1Drive & Cleanup
 
 on:
   workflow_dispatch:
@@ -12,12 +12,12 @@ on:
     - cron: '0 22 * * *'
 
 jobs:
-  delete-all-runs:
+  process-upload-delete:
     runs-on: ubuntu-latest
     permissions:
-      actions: write
-      contents: read
-
+      actions: write # Để xóa workflow
+      contents: read # Để checkout code
+      
     steps:
       - name: Authenticate Request
         if: github.event_name == 'workflow_dispatch'
@@ -26,10 +26,86 @@ jobs:
           AUTH_KEY_SECRET: ${{ secrets.AUTH_KEY }}
         run: |
           if [ "$AUTH_KEY_INPUT" != "$AUTH_KEY_SECRET" ]; then
-            echo "::error::Invalid authentication key. Aborting deletion."
+            echo "::error::Invalid authentication key. Aborting."
             exit 1
           fi
           echo "Authentication successful"
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: PREVIEW
+          ssh-key: ${{ secrets.CLONEC_KEY }}
+          repository: buihien224/colour_erofs_tool
+
+      - name: Setting up Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
+          sudo pip3 install ConfigObj
+          sudo pip3 install telebot
+
+      - name: Set up VIETSUB (Timezone)
+        run: |
+          echo "Setting Vietnam timezone"
+          sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+
+      - name: Set up Rclone
+        run: |
+          mkdir -p bin
+          # Tải rclone tùy chỉnh như yêu cầu
+          aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+          chmod +x bin/rclone1
+
+      - name: Create Rclone Config
+        env:
+          # Bạn cần tạo Secret tên RCLONE_CONF chứa nội dung config cho 1drive1
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONF }}
+        run: |
+          echo "$RCLONE_CONFIG_CONTENT" > rclone.conf
+          echo "Rclone config created."
+
+      - name: Scan Logs & Upload to OneDrive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Scanning recent workflow runs for logs..."
+          
+          # Lấy danh sách 10 lần chạy gần nhất
+          RUN_IDS=$(gh run list --limit 10 --json databaseId -q '.[].databaseId')
+
+          # Lấy ngày hiện tại format: 04-12-2025
+          CURRENT_DATE=$(date +"%d-%m-%Y")
+
+          for id in $RUN_IDS; do
+            echo "Processing Run ID: $id"
+            
+            # Tải log về file tạm
+            gh run view $id --log > temp_log.txt 2>/dev/null || true
+            
+            if [ -s temp_log.txt ]; then
+              # Tìm kiếm tên thiết bị trong log
+              # Pattern: [Initialization][vsteam][Device][PGEM10]
+              DEVICE=$(grep "\[Initialization\]\[vsteam\]\[Device\]" temp_log.txt | head -1 | awk -F'[][]' '{print $8}')
+              
+              if [[ ! -z "$DEVICE" ]]; then
+                echo "Found Device: $DEVICE in Run $id"
+                
+                # Định nghĩa đường dẫn đích: log/04-12-2025/PGEM10/run_12345.log
+                TARGET_PATH="1drive1:log/$CURRENT_DATE/$DEVICE/run_$id.log"
+                
+                echo "Uploading to: $TARGET_PATH"
+                
+                # Thực hiện upload bằng rclone1
+                ./bin/rclone1 copy temp_log.txt "$TARGET_PATH" --config rclone.conf
+                
+              else
+                echo "Device name not found in Run $id, skipping upload."
+              fi
+            fi
+            # Dọn dẹp file tạm
+            rm -f temp_log.txt
+          done
 
       - name: Delete All Workflow Runs
         uses: Mattraks/delete-workflow-runs@v2
