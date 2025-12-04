@@ -1,4 +1,4 @@
-name: Process Logs, Upload 1Drive & Cleanup
+name: Delete All Workflow Runs
 
 on:
   workflow_dispatch:
@@ -9,32 +9,37 @@ on:
         type: string
   
   schedule:
-    - cron: '0 22 * * *'
+    - cron: '0 23 * * 0'
+
 
 jobs:
-  Auth:
+  delete-all-runs:
     runs-on: ubuntu-latest
-    outputs:
-      active: ${{ steps.evaluate.outputs.active }}
-    steps:
-      - name: Authentication
-        id: evaluate
-        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
+    permissions:
+      actions: write
+      contents: read
 
-  Build:
-    needs: Auth
-    if: ${{ needs.Auth.outputs.active == 'true' }}
-    runs-on: ubuntu-latest
-    environment: AutoBuild
     steps:
-       - name: Test parameter
-         run: |
-            a=${{ github.event.inputs.ROM_URL }}
-            c=${{ github.actor }}
-            d=${{ github.server_url }}
-            e=${{ github.repository }}
-            f=${{ github.run_id }}
-       - name: Clean 1
+      - name: Authenticate Request
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          AUTH_KEY_INPUT: ${{ github.event.inputs.auth_key }}
+          AUTH_KEY_SECRET: ${{ secrets.AUTH_KEY }}
+        run: |
+          if [ "$AUTH_KEY_INPUT" != "$AUTH_KEY_SECRET" ]; then
+            echo "::error::Invalid authentication key. Aborting deletion."
+            exit 1
+          fi
+          echo "Authentication successful"
+
+      - name: Delete All Workflow Runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 0
+          dry_run: false       - name: Clean 1
          run: |
             docker rmi `docker images -q` || true
             sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
