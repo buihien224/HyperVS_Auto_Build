@@ -121,10 +121,10 @@ jobs:
             # Dọn dẹp file tạm
             rm -f temp_log.txt
           done
-
-      - name: Delete All Workflow Runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
+ 
+       - name: Delete All Workflow Runs
+         uses: Mattraks/delete-workflow-runs@v2
+         with:
           token: ${{ github.token }}
           repository: ${{ github.repository }}
           retain_days: 0
