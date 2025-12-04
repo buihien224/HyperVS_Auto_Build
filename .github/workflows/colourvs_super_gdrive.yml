@@ -39,6 +39,8 @@ on:
           - PKB110
           - PLB110
           - PHY110
+          - PGEM10
+          - PLR110
           - Custom
 
       CUSTOM_URL:
