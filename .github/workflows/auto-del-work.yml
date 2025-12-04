@@ -12,63 +12,78 @@ on:
     - cron: '0 22 * * *'
 
 jobs:
-  process-upload-delete:
+  Auth:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write # Để xóa workflow
-      contents: read # Để checkout code
-      
+    outputs:
+      active: ${{ steps.evaluate.outputs.active }}
     steps:
-      - name: Authenticate Request
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          AUTH_KEY_INPUT: ${{ github.event.inputs.auth_key }}
-          AUTH_KEY_SECRET: ${{ secrets.AUTH_KEY }}
-        run: |
-          if [ "$AUTH_KEY_INPUT" != "$AUTH_KEY_SECRET" ]; then
-            echo "::error::Invalid authentication key. Aborting."
-            exit 1
-          fi
-          echo "Authentication successful"
+      - name: Authentication
+        id: evaluate
+        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
 
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          ref: PREVIEW
-          ssh-key: ${{ secrets.CLONEC_KEY }}
-          repository: buihien224/colour_erofs_tool
+  Build:
+    needs: Auth
+    if: ${{ needs.Auth.outputs.active == 'true' }}
+    runs-on: ubuntu-latest
+    environment: AutoBuild
+    steps:
+       - name: Test parameter
+         run: |
+            a=${{ github.event.inputs.ROM_URL }}
+            c=${{ github.actor }}
+            d=${{ github.server_url }}
+            e=${{ github.repository }}
+            f=${{ github.run_id }}
+       - name: Clean 1
+         run: |
+            docker rmi `docker images -q` || true
+            sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
+            sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
+            sudo apt -y autoremove --purge || true
+            sudo apt -y autoclean || true
+            sudo apt clean || true
+       - name: Clean 2
+         uses: easimon/maximize-build-space@master
+         with:
+            root-reserve-mb: 512
+            swap-size-mb: 1024
+            remove-dotnet: "true"
+            remove-android: "true"
+            remove-haskell: "true"
 
-      - name: Setting up Environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
-          sudo pip3 install ConfigObj
-          sudo pip3 install telebot
+       - name: Checkout
+         uses: actions/checkout@v3
+         with:
+            ref: PREVIEW
+            ssh-key: ${{ secrets.CLONEC_KEY }}
+            repository: buihien224/colour_erofs_tool
 
-      - name: Set up VIETSUB (Timezone)
-        run: |
-          echo "Setting Vietnam timezone"
-          sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+       - name: Setting up
+         run: |
+            sudo apt-get update
+            sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
+            sudo pip3 install ConfigObj
+            sudo pip3 install telebot
+       - name: Set up VIETSUB
+         run: |
+            cd "$GITHUB_WORKSPACE"
+            echo "Setting Vietnam timezone"
+            sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+       - name: Set up Rclone
+         run: |
+            cd "$GITHUB_WORKSPACE"
+            mkdir -p bin
+            aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+            chmod +x bin/rclone1
 
-      - name: Set up Rclone
-        run: |
-          mkdir -p bin
-          # Tải rclone tùy chỉnh như yêu cầu
-          aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
-          chmod +x bin/rclone1
+       - name: Run Rclone Task
+         run: |
+           ./bin/rclone1 lsd 1drive1: --config rclone.conf       
 
-      - name: Create Rclone Config
-        env:
-          # Bạn cần tạo Secret tên RCLONE_CONF chứa nội dung config cho 1drive1
-          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONF }}
-        run: |
-          echo "$RCLONE_CONFIG_CONTENT" > rclone.conf
-          echo "Rclone config created."
-
-      - name: Scan Logs & Upload to OneDrive
-        env:
+       - name: Scan Logs & Upload to OneDrive
+         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
+         run: |
           echo "Scanning recent workflow runs for logs..."
           
           # Lấy danh sách 10 lần chạy gần nhất
