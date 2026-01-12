@@ -11,6 +11,8 @@ on:
         options:
           - PLK110
           - PLQ110
+          - PLU110
+          - PLY110
           - PJZ110
           - PKX110
           - PKG110
