@@ -42,6 +42,7 @@ on:
         - RMX5200
         - RMX6688
         - RMX6699
+        - RMX8899
         - Custom
       CUSTOM_URL:
         description: Custom
