@@ -1,229 +1,201 @@
 name: coloros_test_build
-
-on:
+true:
   workflow_dispatch:
     inputs:
       ROM_URL:
-        description: 'Select device code OR Select Custom'
+        description: Select device code OR Select Custom
         required: true
-        default: 'PKG110'
-        type: choice 
+        default: PKG110
+        type: choice
         options:
-          - PLK110
-          - PLQ110
-          - PLU110
-          - PLY110
-          - PJZ110
-          - PKX110
-          - PKG110
-          - PKR110
-          - PLF110
-          - PLC110
-          - PJE110
-          - PJX110
-          - PJF110
-          - PJD110
-          - OPD2413
-          - OPD2404
-          - RMX6699
-          - RMX5200
-          - RMX5010
-          - RMX5090
-          - RMX6688
-          - RMX3800
-          - RMX3888
-          - RMX5060
-          - RMX5062
-          - RMX5080
-          - RMX5071
-          - PKT110
-          - PKC110
-          - PKB110
-          - PLB110
-          - PHY110
-          - PGEM10
-          - PLR110
-          - RMX8899
-          - Custom
-     
+        - OPD2404
+        - OPD2413
+        - PGEM10
+        - PHY110
+        - PHY120
+        - PJD110
+        - PJE110
+        - PJF110
+        - PJX110
+        - PJZ110
+        - PKB110
+        - PKC110
+        - PKG110
+        - PKR110
+        - PKT110
+        - PKX110
+        - PLB110
+        - PLC110
+        - PLF110
+        - PLK110
+        - PLQ110
+        - PLR110
+        - PLU110
+        - PLY110
+        - RMX3800
+        - RMX3888
+        - RMX5010
+        - RMX5060
+        - RMX5062
+        - RMX5071
+        - RMX5080
+        - RMX5090
+        - RMX5200
+        - RMX6688
+        - RMX6699
+        - RMX8899
+        - Custom
       CUSTOM_URL:
-        description: 'Custom'
+        description: Custom
         required: false
         default: ''
-
       key:
-        description: 'Active Key'
+        description: Active Key
         required: true
         default: ''
       trigger:
-        description: 'Trigger name'
+        description: Trigger name
         required: true
-        default: 'Auto_Build'
-
+        default: Auto_Build
 jobs:
   Auth:
     runs-on: ubuntu-latest
     outputs:
       active: ${{ steps.evaluate.outputs.active }}
     steps:
-      - name: Authentication
-        id: evaluate
-        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
-
+    - name: Authentication
+      id: evaluate
+      run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> $GITHUB_OUTPUT
   Build:
     needs: Auth
     if: ${{ needs.Auth.outputs.active == 'true' }}
     runs-on: ubuntu-latest
     environment: AutoBuild
     steps:
-       - name: Test parameter
-         run: |
-            a=${{ github.event.inputs.ROM_URL }}
-            c=${{ github.actor }}
-            d=${{ github.server_url }}
-            e=${{ github.repository }}
-            f=${{ github.run_id }}
+    - name: Test parameter
+      run: 'a=${{ github.event.inputs.ROM_URL }}
 
-       - name: Clean 1
-         run: |
-            docker rmi `docker images -q` || true
-            sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
-            sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
-            sudo apt -y autoremove --purge || true
-            sudo apt -y autoclean || true
-            sudo apt clean || true
+        c=${{ github.actor }}
 
-       - name: Clean 2
-         uses: easimon/maximize-build-space@master
-         with:
-            root-reserve-mb: 512
-            swap-size-mb: 1024
-            remove-dotnet: "true"
-            remove-android: "true"
-            remove-haskell: "true"
+        d=${{ github.server_url }}
 
-       - name: Checkout
-         uses: actions/checkout@v3
-         with:
-            ref: PREVIEW
-            ssh-key: ${{ secrets.CLONEC_KEY }}
-            repository: buihien224/colour_erofs_tool
+        e=${{ github.repository }}
 
-       - name: Setting up
-         run: |
-            sudo apt-get update
-            sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
-            sudo pip3 install ConfigObj
-            sudo pip3 install telebot
+        f=${{ github.run_id }}
 
-       - name: Set up VIETSUB
-         run: |
-            cd "$GITHUB_WORKSPACE"
-            echo "Setting Vietnam timezone"
-            sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+        '
+    - name: Clean 1
+      run: 'docker rmi `docker images -q` || true
 
-       - name: Set up Rclone
-         run: |
-            cd "$GITHUB_WORKSPACE"
-            mkdir -p bin
-            aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
-            chmod +x bin/rclone1
+        sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
 
-       - name: Download ROM
-         run: |
-            set -e
-            OPTION="${{ github.event.inputs.ROM_URL }}"
-            CUSTOM="${{ github.event.inputs.CUSTOM_URL }}"
-            if [ "$OPTION" == "Custom" ]; then
-              if [ -z "$CUSTOM" ]; then
-                echo "❌ Error: Custom selected but empty URL!"
-                exit 1
-              fi
-              INPUT="$CUSTOM"
-            else
-              INPUT="$OPTION"
-            fi
-            LENGTH=${#INPUT}            
-            if [ "$LENGTH" -gt 10 ]; then
-              echo "::add-mask::$INPUT"
-              echo "Detected Direct URL. Downloading with aria2..."
-              aria2c -x16 -s16 -k1M --check-certificate=false "$INPUT"
-            else
-              echo "Detected Filename Prefix. Searching cloud..."              
-              FILE="$(./bin/rclone1 --config bin/lsc.conf lsf '1drive1:/Mirror' --files-only --include "${INPUT}*" | head -n1)"
-              if [ -n "$FILE" ]; then
-                echo "✅ Found in OneDrive: $FILE"
-                SOURCE_PATH="1drive1:/Mirror"
-              else
-                FILE="$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include "${INPUT}*" | head -n1)"
-                if [ -n "$FILE" ]; then
-                  echo "✅ Found in GDrive: $FILE"
-                  SOURCE_PATH="gdrive1:/VS_Stock"
-                fi
-              fi
-              if [ -z "$FILE" ]; then
-                echo "❌ Error: File not found in OneDrive or GDrive!"
-                exit 1
-              fi
-              DIRECT_URL=$(./bin/rclone1 --config bin/lsc.conf link "$SOURCE_PATH/$FILE" || true)
-              if [ -n "$DIRECT_URL" ]; then
-                 echo "::add-mask::$DIRECT_URL"
-                 echo "🚀 Link generated! Downloading with aria2..."
-                 aria2c -x16 -s16 -k1M --check-certificate=false -o "$FILE" "$DIRECT_URL"
-              else
-                 echo "⚠️ No direct link. Falling back to rclone copy..."
-                 ./bin/rclone1 --config bin/lsc.conf copy "$SOURCE_PATH/$FILE" . \
-                   --transfers=4 --checkers=8 --multi-thread-streams=16 \
-                   --buffer-size=64M --drive-chunk-size=64M \
-                   --ignore-checksum --no-update-modtime --no-check-dest --progress
-              fi
-            fi            
-            echo "🎉 Process completed. Content:"
-            ls -lh
+        sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
 
-       - name: Init project
-         run: |
-            ./bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }}
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            sudo chmod 777 -R *
+        sudo apt -y autoremove --purge || true
 
-       - name: Download vsstuff
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            ./bhlnk -s
+        sudo apt -y autoclean || true
 
-       - name: Extract state
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 3 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            ./bhlnk -p extract
+        sudo apt clean || true
 
-       - name: Patch Rom with MIUIVS mod
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 4 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            ./bhlnk -p patchvs
+        '
+    - name: Clean 2
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 512
+        swap-size-mb: 1024
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: PREVIEW
+        ssh-key: ${{ secrets.CLONEC_KEY }}
+        repository: buihien224/colour_erofs_tool
+    - name: Setting up
+      run: 'sudo apt-get update
 
-       - name: Re-create partition
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 5 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            ./bhlnk -p pack
+        sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli axel python3-pip zipalign apksigner xmlstarlet aapt p7zip-full device-tree-compiler aria2
 
-       - name: Upload
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 6 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
-            ./bhlnk -u || exit 0  # Continue if not 0
-            echo "Upload returned 0. Exiting workflow."
-            exit 1
+        sudo pip3 install ConfigObj
 
-       - name: Push Notification to Telegram
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 0 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+        sudo pip3 install telebot
 
-       - name: The job has cancelled
-         if: ${{ cancelled() }}
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+        '
+    - name: Set up VIETSUB
+      run: 'cd "$GITHUB_WORKSPACE"
 
-       - name: The job has failed
-         if: ${{ failure() }}
-         run: |
-            ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+        echo "Setting Vietnam timezone"
+
+        sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+
+        '
+    - name: Set up Rclone
+      run: 'cd "$GITHUB_WORKSPACE"
+
+        mkdir -p bin
+
+        aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+
+        chmod +x bin/rclone1
+
+        '
+    - name: Download ROM
+      run: "set -e\nOPTION=\"${{ github.event.inputs.ROM_URL }}\"\nCUSTOM=\"${{ github.event.inputs.CUSTOM_URL }}\"\nif [ \"$OPTION\" == \"Custom\" ]; then\n  if [ -z \"$CUSTOM\" ]; then\n    echo \"❌ Error: Custom selected but empty URL!\"\n    exit 1\n  fi\n  INPUT=\"$CUSTOM\"\nelse\n  INPUT=\"$OPTION\"\nfi\nLENGTH=${#INPUT}            \nif [ \"$LENGTH\" -gt 10 ]; then\n  echo \"::add-mask::$INPUT\"\n  echo \"Detected Direct URL. Downloading with aria2...\"\n  aria2c -x16 -s16 -k1M --check-certificate=false \"$INPUT\"\nelse\n  echo \"Detected Filename Prefix. Searching cloud...\"              \n  FILE=\"$(./bin/rclone1 --config bin/lsc.conf lsf '1drive1:/Mirror' --files-only --include \"${INPUT}*\" | head -n1)\"\n  if [ -n \"$FILE\" ]; then\n    echo \"✅ Found in OneDrive: $FILE\"\n    SOURCE_PATH=\"1drive1:/Mirror\"\n  else\n    FILE=\"$(./bin/rclone1 --config bin/lsc.conf lsf 'gdrive1:/VS_Stock' --files-only --include \"${INPUT}*\" | head -n1)\"\n    if [ -n \"$FILE\" ]; then\n     \
+        \ echo \"✅ Found in GDrive: $FILE\"\n      SOURCE_PATH=\"gdrive1:/VS_Stock\"\n    fi\n  fi\n  if [ -z \"$FILE\" ]; then\n    echo \"❌ Error: File not found in OneDrive or GDrive!\"\n    exit 1\n  fi\n  DIRECT_URL=$(./bin/rclone1 --config bin/lsc.conf link \"$SOURCE_PATH/$FILE\" || true)\n  if [ -n \"$DIRECT_URL\" ]; then\n     echo \"::add-mask::$DIRECT_URL\"\n     echo \"\U0001F680 Link generated! Downloading with aria2...\"\n     aria2c -x16 -s16 -k1M --check-certificate=false -o \"$FILE\" \"$DIRECT_URL\"\n  else\n     echo \"⚠️ No direct link. Falling back to rclone copy...\"\n     ./bin/rclone1 --config bin/lsc.conf copy \"$SOURCE_PATH/$FILE\" . \\\n       --transfers=4 --checkers=8 --multi-thread-streams=16 \\\n       --buffer-size=64M --drive-chunk-size=64M \\\n       --ignore-checksum --no-update-modtime --no-check-dest --progress\n  fi\nfi            \necho \"\U0001F389 Process completed. Content:\"\nls -lh\n"
+    - name: Init project
+      run: './bhlnk -i ${{ github.event.inputs.trigger }} ${{ github.event.inputs.ROM_URL }}
+
+        ./bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        sudo chmod 777 -R *
+
+        '
+    - name: Download vsstuff
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        ./bhlnk -s
+
+        '
+    - name: Extract state
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 3 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        ./bhlnk -p extract
+
+        '
+    - name: Patch Rom with MIUIVS mod
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 4 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        ./bhlnk -p patchvs
+
+        '
+    - name: Re-create partition
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 5 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        ./bhlnk -p pack
+
+        '
+    - name: Upload
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 6 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        ./bhlnk -u || exit 0  # Continue if not 0
+
+        echo "Upload returned 0. Exiting workflow."
+
+        exit 1
+
+        '
+    - name: Push Notification to Telegram
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} 0 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        '
+    - name: The job has cancelled
+      if: ${{ cancelled() }}
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -1 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        '
+    - name: The job has failed
+      if: ${{ failure() }}
+      run: './bhlnk -p notification ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} -2 "$(git log -1 --pretty=format:"%s")" "${{ github.run_id }}"
+
+        '
