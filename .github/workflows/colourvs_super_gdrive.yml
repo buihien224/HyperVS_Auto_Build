@@ -1,61 +1,4 @@
 name: coloros_super_create2
-true:
-  workflow_dispatch:
-    inputs:
-      ROM_URL:
-        description: Select device code
-        required: true
-        default: PKG110
-        type: choice
-        options:
-        - OPD2404
-        - OPD2413
-        - PGEM10
-        - PHY110
-        - PJD110
-        - PJE110
-        - PJF110
-        - PJX110
-        - PJZ110
-        - PKB110
-        - PKC110
-        - PKG110
-        - PKR110
-        - PKT110
-        - PKX110
-        - PLB110
-        - PLC110
-        - PLF110
-        - PLK110
-        - PLQ110
-        - PLR110
-        - PLU110
-        - PLY110
-        - RMX3800
-        - RMX3888
-        - RMX5010
-        - RMX5060
-        - RMX5062
-        - RMX5071
-        - RMX5080
-        - RMX5090
-        - RMX5200
-        - RMX6688
-        - RMX6699
-        - RMX8899
-        - Custom
-      CUSTOM_URL:
-        description: Custom
-        required: false
-        default: ''
-      key:
-        description: Active Key
-        required: true
-        default: ''
-      trigger:
-        description: Trigger name
-        required: true
-        default: Auto_Build
 jobs:
   Auth:
     runs-on: ubuntu-latest
@@ -164,3 +107,60 @@ jobs:
         '
     - name: Upload
       run: "./bhlnk -u || exit 0 \necho \"Upload returned 0. Exiting workflow.\"\nexit 1\n"
+'on':
+  workflow_dispatch:
+    inputs:
+      ROM_URL:
+        description: Select device code
+        required: true
+        default: PKG110
+        type: choice
+        options:
+        - OPD2404
+        - OPD2413
+        - PGEM10
+        - PHY110
+        - PJD110
+        - PJE110
+        - PJF110
+        - PJX110
+        - PJZ110
+        - PKB110
+        - PKC110
+        - PKG110
+        - PKR110
+        - PKT110
+        - PKX110
+        - PLB110
+        - PLC110
+        - PLF110
+        - PLK110
+        - PLQ110
+        - PLR110
+        - PLU110
+        - PLY110
+        - RMX3800
+        - RMX3888
+        - RMX5010
+        - RMX5060
+        - RMX5062
+        - RMX5071
+        - RMX5080
+        - RMX5090
+        - RMX5200
+        - RMX6688
+        - RMX6699
+        - RMX8899
+        - Custom
+      CUSTOM_URL:
+        description: Custom
+        required: false
+        default: ''
+      key:
+        description: Active Key
+        required: true
+        default: ''
+      trigger:
+        description: Trigger name
+        required: true
+        default: Auto_Build
