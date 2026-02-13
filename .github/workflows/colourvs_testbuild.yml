@@ -43,6 +43,7 @@ on:
           - PHY110
           - PGEM10
           - PLR110
+          - RMX8899
           - Custom
      
       CUSTOM_URL:
