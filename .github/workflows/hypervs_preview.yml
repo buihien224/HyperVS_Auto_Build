@@ -61,7 +61,7 @@ jobs:
        - name: Checkout
          uses: actions/checkout@v3
          with:
-            ref: PREVIEW
+            ref: HyperOS
             ssh-key: ${{ secrets.CLONE_KEY }}
             repository: buihien224/vietsub_erofs_tool
        
