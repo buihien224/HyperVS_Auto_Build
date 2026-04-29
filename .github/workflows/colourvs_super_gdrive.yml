@@ -32,6 +32,7 @@ on:
         - PLU110
         - PLY110
         - PLZ110
+        - PMB110
         - RMX3800
         - RMX3888
         - RMX5010
