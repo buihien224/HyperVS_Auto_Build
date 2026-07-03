@@ -87,7 +87,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ssh-key: ${{ secrets.CLONE_KEY }}
-          repository: buihien224/vietsub_erofs_tool
+          repository: buihien224/VS_Build_Tool
           ref: ${{ github.event.inputs.branch }}
 
       - name: Setup
