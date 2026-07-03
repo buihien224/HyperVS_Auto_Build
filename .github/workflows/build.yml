@@ -1,0 +1,127 @@
+name: VS Build Tool
+
+on:
+  workflow_dispatch:
+    inputs:
+      ROM_URL:
+        description: "OTA URL or device codename"
+        required: true
+        default: ""
+      mode:
+        description: "Build mode"
+        required: true
+        default: "vs"
+        type: choice
+        options:
+          - vs
+          - stock
+      branch:
+        description: "Tool branch"
+        required: true
+        default: "PREVIEW"
+        type: choice
+        options:
+          - PREVIEW
+          - STABLE
+      key:
+        description: "Active Key"
+        required: true
+        default: ""
+      trigger:
+        description: "Builder name"
+        required: true
+        default: "Auto_Build"
+
+jobs:
+  Auth:
+    runs-on: ubuntu-latest
+    outputs:
+      active: ${{ steps.evaluate.outputs.active }}
+    steps:
+      - name: Authentication
+        id: evaluate
+        run: echo "active=${{ github.event.inputs.key == secrets.AUTH_KEY }}" >> "$GITHUB_OUTPUT"
+
+  Build:
+    needs: Auth
+    if: ${{ needs.Auth.outputs.active == 'true' }}
+    runs-on: ubuntu-latest
+    environment: AutoBuild
+    env:
+      ROM_URL: ${{ github.event.inputs.ROM_URL }}
+      BUILD_MODE: ${{ github.event.inputs.mode }}
+      TOOL_BRANCH: ${{ github.event.inputs.branch }}
+      BUILDER_NAME: ${{ github.event.inputs.trigger }}
+      NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      NOTIFY_RUN_ID: ${{ github.run_id }}
+
+    steps:
+      - name: Parameters
+        run: |
+          echo "ROM_URL=$ROM_URL"
+          echo "BUILD_MODE=$BUILD_MODE"
+          echo "TOOL_BRANCH=$TOOL_BRANCH"
+          echo "BUILDER_NAME=$BUILDER_NAME"
+          echo "actor=${{ github.actor }}"
+          echo "run_id=${{ github.run_id }}"
+
+      - name: Clean runner
+        run: |
+          docker rmi $(docker images -q) || true
+          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
+          sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
+          sudo apt -y autoremove --purge || true
+          sudo apt -y autoclean || true
+          sudo apt clean || true
+
+      - name: Maximize disk
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.CLONE_KEY }}
+          repository: buihien224/vietsub_erofs_tool
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip zipalign apksigner xmlstarlet aapt p7zip-full
+          python3 -m pip install --user ConfigObj pyTelegramBotAPI pytz requests
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+          chmod +x ./bhlnk bin/* || true
+          aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
+          chmod +x bin/rclone1
+
+      - name: Run build
+        run: |
+          export NOTIFY_GITLOG="$(git log -1 --pretty=format:%s)"
+          case "$BUILD_MODE" in
+            vs)
+              ./bhlnk build "$ROM_URL" "$BUILDER_NAME"
+              ;;
+            stock)
+              ./bhlnk stock "$ROM_URL" "$BUILDER_NAME"
+              ;;
+            *)
+              echo "Unknown BUILD_MODE: $BUILD_MODE"
+              exit 1
+              ;;
+          esac
+
+      - name: Push stop notification
+        if: ${{ failure() || cancelled() }}
+        run: |
+          if [[ "${{ job.status }}" == "cancelled" ]]; then
+            ./bhlnk notification "$NOTIFY_ACTION_LINK" -1 "$(git log -1 --pretty=format:%s)" "$NOTIFY_RUN_ID" || true
+          else
+            ./bhlnk notification "$NOTIFY_ACTION_LINK" -2 "$(git log -1 --pretty=format:%s)" "$NOTIFY_RUN_ID" || true
+          fi
