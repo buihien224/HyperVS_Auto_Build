@@ -86,7 +86,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ssh-key: ${{ secrets.CLONE_KEY }}
+          ssh-key: ${{ secrets.VS_BUILD_TOOL }}
           repository: buihien224/VS_Build_Tool
           ref: ${{ github.event.inputs.branch }}
 
