@@ -100,6 +100,10 @@ jobs:
           chmod +x ./bhlnk bin/* || true
           aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
           chmod +x bin/rclone1
+          
+      - name: Verify OneDrive API
+        run: |
+          python3 bin/onedrive_api.py refresh-token --force
 
       - name: Run build
         run: |
