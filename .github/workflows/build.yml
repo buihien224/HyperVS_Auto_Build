@@ -15,6 +15,7 @@ on:
         options:
           - vs
           - stock
+          - stock-encrypted
       branch:
         description: "Tool branch"
         required: true
@@ -23,6 +24,10 @@ on:
         options:
           - PREVIEW
           - STABLE
+      region:
+        description: "ColorOS region for encrypted stock builds"
+        required: false
+        default: "cn"
       key:
         description: "Active Key"
         required: true
@@ -51,9 +56,12 @@ jobs:
       ROM_URL: ${{ github.event.inputs.ROM_URL }}
       BUILD_MODE: ${{ github.event.inputs.mode }}
       TOOL_BRANCH: ${{ github.event.inputs.branch }}
+      ROM_REGION: ${{ github.event.inputs.region || 'cn' }}
       BUILDER_NAME: ${{ github.event.inputs.trigger }}
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
+      RCLONE_CONFIG: ${{ github.workspace }}/.config/rclone/rclone.conf
+      RCLONE_CONFIG_PASS: miuivs.com
 
     steps:
       - name: Parameters
@@ -94,16 +102,30 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip zipalign apksigner xmlstarlet aapt p7zip-full
-          python3 -m pip install --user ConfigObj pyTelegramBotAPI pytz requests
+          python3 -m pip install --user ConfigObj pyTelegramBotAPI pytz requests cryptography
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           sudo timedatectl set-timezone Asia/Ho_Chi_Minh
           chmod +x ./bhlnk bin/* || true
           aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
           chmod +x bin/rclone1
-          
-      - name: Verify OneDrive API
+
+      - name: Setup rclone config
+        env:
+          RCLONE_CONFIG_RAW: ${{ secrets.RCLONE_CONFIG }}
+          RCLONE_CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
         run: |
-          python3 bin/onedrive_api.py refresh-token --force
+          mkdir -p "$(dirname "$RCLONE_CONFIG")"
+          if [[ -n "$RCLONE_CONFIG_B64" ]]; then
+            printf '%s' "$RCLONE_CONFIG_B64" | base64 -d > "$RCLONE_CONFIG"
+          elif [[ -n "$RCLONE_CONFIG_RAW" ]]; then
+            printf '%s' "$RCLONE_CONFIG_RAW" > "$RCLONE_CONFIG"
+          else
+            echo "Missing rclone config secret: set RCLONE_CONFIG_B64 or RCLONE_CONFIG"
+            exit 1
+          fi
+          chmod 600 "$RCLONE_CONFIG"
+          ./bin/rclone1 listremotes
+          ./bin/rclone1 lsd teamdrive:VS_BackEnd >/dev/null
 
       - name: Run build
         run: |
@@ -114,6 +136,9 @@ jobs:
               ;;
             stock)
               ./bhlnk stock "$ROM_URL" "$BUILDER_NAME"
+              ;;
+            stock-encrypted)
+              ./bhlnk buildstock "$ROM_URL" "$ROM_REGION" "$BUILDER_NAME" --enc
               ;;
             *)
               echo "Unknown BUILD_MODE: $BUILD_MODE"
