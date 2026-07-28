@@ -109,24 +109,6 @@ jobs:
           aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
           chmod +x bin/rclone1
 
-      - name: Setup rclone config
-        env:
-          RCLONE_CONFIG_RAW: ${{ secrets.RCLONE_CONFIG }}
-          RCLONE_CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
-        run: |
-          mkdir -p "$(dirname "$RCLONE_CONFIG")"
-          if [[ -n "$RCLONE_CONFIG_B64" ]]; then
-            printf '%s' "$RCLONE_CONFIG_B64" | base64 -d > "$RCLONE_CONFIG"
-          elif [[ -n "$RCLONE_CONFIG_RAW" ]]; then
-            printf '%s' "$RCLONE_CONFIG_RAW" > "$RCLONE_CONFIG"
-          else
-            echo "Missing rclone config secret: set RCLONE_CONFIG_B64 or RCLONE_CONFIG"
-            exit 1
-          fi
-          chmod 600 "$RCLONE_CONFIG"
-          ./bin/rclone1 listremotes
-          ./bin/rclone1 lsd teamdrive:VS_BackEnd >/dev/null
-
       - name: Run build
         run: |
           export NOTIFY_GITLOG="$(git log -1 --pretty=format:%s)"
