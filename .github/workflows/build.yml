@@ -60,7 +60,6 @@ jobs:
       BUILDER_NAME: ${{ github.event.inputs.trigger }}
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
-      RCLONE_CONFIG: ${{ github.workspace }}/.config/rclone/rclone.conf
       RCLONE_CONFIG_PASS: miuivs.com
 
     steps:
