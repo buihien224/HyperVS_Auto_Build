@@ -61,8 +61,6 @@ jobs:
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
       RCLONE_CONFIG_PASS: miuivs.com
-      ANDROID_HOME: ${{ github.workspace }}/.android-sdk
-      ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
 
     steps:
       - name: Parameters
@@ -108,6 +106,11 @@ jobs:
           cache-dependency-path: |
             backend/*.gradle.kts
             backend/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Configure Android SDK path
+        run: |
+          echo "ANDROID_HOME=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
