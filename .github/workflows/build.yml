@@ -114,9 +114,11 @@ jobs:
         with:
           packages: "platform-tools platforms;android-34 build-tools;34.0.0"
 
-      - name: Verify Android SDK 34
+      - name: Configure Android SDK 34
         run: |
           test -f "$ANDROID_SDK_ROOT/platforms/android-34/android.jar"
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > backend/local.properties
+          test -s backend/local.properties
 
       - name: Setup
         run: |
