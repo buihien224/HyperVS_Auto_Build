@@ -87,7 +87,9 @@ jobs:
         with:
           # Keep enough space on the runner root for Actions worker diagnostics.
           root-reserve-mb: 2048
-          swap-size-mb: 0
+          # The action always creates an LVM swap LV; zero makes lvcreate fail.
+          # Keep only a minimal valid swap so almost all space remains for buildlv.
+          swap-size-mb: 64
           remove-dotnet: "true"
           remove-android: "true"
           remove-haskell: "true"
