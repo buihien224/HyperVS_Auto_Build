@@ -61,6 +61,7 @@ jobs:
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
       RCLONE_CONFIG_PASS: miuivs.com
+      CI_LOW_DISK: "true"
 
     steps:
       - name: Parameters
@@ -84,8 +85,9 @@ jobs:
       - name: Maximize disk
         uses: easimon/maximize-build-space@master
         with:
-          root-reserve-mb: 512
-          swap-size-mb: 1024
+          # Keep enough space on the runner root for Actions worker diagnostics.
+          root-reserve-mb: 2048
+          swap-size-mb: 0
           remove-dotnet: "true"
           remove-android: "true"
           remove-haskell: "true"
@@ -133,9 +135,35 @@ jobs:
           chmod +x ./bhlnk bin/* || true
           aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
           chmod +x bin/rclone1
+          python3 -m pip cache purge || true
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+          df -h / "$GITHUB_WORKSPACE"
 
       - name: Run build
         run: |
+          cleanup_ci_workspace() {
+            status=$?
+            echo "[CI CLEANUP] Releasing build intermediates (status=$status)"
+            sudo rm -rf -- \
+              "$GITHUB_WORKSPACE/zip_temp" \
+              "$GITHUB_WORKSPACE/jar_temp" \
+              "$GITHUB_WORKSPACE/img_temp"
+            sudo find "$GITHUB_WORKSPACE" -maxdepth 3 -type f \
+              \( -name '*.raw' -o -name '*.seed' -o -name 'payload.bin' \) \
+              -delete 2>/dev/null || true
+            # The build command uploads the archive before returning. Release
+            # final packages and retained firmware images so later Actions
+            # steps can still write diagnostics/notifications.
+            sudo find "$GITHUB_WORKSPACE" -maxdepth 1 -type f \
+              \( -name 'colourvs_*.7z' -o -name 'hypervs_*.7z' -o -name '*-ota_full-*.7z' \) \
+              -delete 2>/dev/null || true
+            sudo find "$GITHUB_WORKSPACE" -mindepth 2 -maxdepth 2 -type d \
+              -name firmware-update -exec rm -rf -- {} + 2>/dev/null || true
+            df -h / "$GITHUB_WORKSPACE" || true
+            return "$status"
+          }
+          trap cleanup_ci_workspace EXIT
           export NOTIFY_GITLOG="$(git log -1 --pretty=format:%s)"
           case "$BUILD_MODE" in
             vs)
