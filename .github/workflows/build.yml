@@ -101,6 +101,11 @@ jobs:
           repository: buihien224/VS_Build_Tool
           ref: ${{ github.event.inputs.branch }}
 
+      - name: Validate build scripts
+        run: |
+          bash -n ./bhlnk
+          python3 -m py_compile bin/patch_x9bl.py bin/lk_info.py
+
       - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
@@ -110,22 +115,6 @@ jobs:
           cache-dependency-path: |
             backend/*.gradle.kts
             backend/gradle/wrapper/gradle-wrapper.properties
-
-      - name: Configure Android SDK path
-        run: |
-          echo "ANDROID_HOME=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
-
-      - name: Configure Android SDK 34
-        run: |
-          test -f "$ANDROID_SDK_ROOT/platforms/android-34/android.jar"
-          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > backend/local.properties
-          test -s backend/local.properties
 
       - name: Setup
         run: |
@@ -144,6 +133,52 @@ jobs:
 
       - name: Run build
         run: |
+          set -euo pipefail
+
+          export ANDROID_HOME="$RUNNER_TEMP/android-sdk"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          sdk_root="$ANDROID_SDK_ROOT"
+          mkdir -p "$sdk_root"
+
+          find_sdkmanager() {
+            find "$sdk_root/cmdline-tools" -type f -path '*/bin/sdkmanager' -perm -u+x 2>/dev/null | head -n 1
+          }
+
+          sdkmanager="$(find_sdkmanager || true)"
+          if [[ -z "$sdkmanager" ]]; then
+            command_tools_url="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+            tools_tmp="$(mktemp -d)"
+            trap 'rm -rf "$tools_tmp"' EXIT
+            curl --fail --location --retry 5 --retry-all-errors \
+              --connect-timeout 20 --max-time 300 \
+              "$command_tools_url" -o "$tools_tmp/commandlinetools.zip"
+            unzip -q "$tools_tmp/commandlinetools.zip" -d "$tools_tmp/unpacked"
+            rm -rf "$sdk_root/cmdline-tools/latest"
+            mkdir -p "$sdk_root/cmdline-tools/latest"
+            mv "$tools_tmp/unpacked/cmdline-tools"/* "$sdk_root/cmdline-tools/latest/"
+            sdkmanager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+            chmod +x "$sdkmanager"
+          fi
+
+          sdk_bin="$(dirname "$sdkmanager")"
+          export PATH="$sdk_bin:$sdk_root/platform-tools:$PATH"
+          packages=()
+          [[ -x "$sdk_root/platform-tools/adb" && -x "$sdk_root/platform-tools/fastboot" ]] || packages+=("platform-tools")
+          [[ -f "$sdk_root/platforms/android-34/android.jar" ]] || packages+=("platforms;android-34")
+          [[ -x "$sdk_root/build-tools/34.0.0/aapt" ]] || packages+=("build-tools;34.0.0")
+          if ((${#packages[@]})); then
+            yes | "$sdkmanager" --sdk_root="$sdk_root" --licenses >/dev/null || true
+            "$sdkmanager" --sdk_root="$sdk_root" "${packages[@]}"
+          fi
+          test -x "$sdk_root/platform-tools/adb"
+          test -x "$sdk_root/platform-tools/fastboot"
+          test -f "$sdk_root/platforms/android-34/android.jar"
+          test -x "$sdk_root/build-tools/34.0.0/aapt"
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > backend/local.properties
+          test -s backend/local.properties
+          adb version
+          fastboot --version
+
           cleanup_ci_workspace() {
             status=$?
             echo "[CI CLEANUP] Releasing build intermediates (status=$status)"
