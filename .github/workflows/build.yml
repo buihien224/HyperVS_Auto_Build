@@ -62,6 +62,12 @@ jobs:
       NOTIFY_RUN_ID: ${{ github.run_id }}
       RCLONE_CONFIG_PASS: miuivs.com
       CI_LOW_DISK: "true"
+      # Root filesystem fills up on large builds; put large caches and temp
+      # files on the workspace volume created by "Maximize disk" instead.
+      TMPDIR: ${{ github.workspace }}/.tmp
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
+      ANDROID_HOME: ${{ github.workspace }}/.android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
 
     steps:
       - name: Parameters
@@ -86,7 +92,7 @@ jobs:
         uses: easimon/maximize-build-space@master
         with:
           # Keep enough space on the runner root for Actions worker diagnostics.
-          root-reserve-mb: 2048
+          root-reserve-mb: 8192
           # The action always creates an LVM swap LV; zero makes lvcreate fail.
           # Keep only a minimal valid swap so almost all space remains for buildlv.
           swap-size-mb: 64
@@ -129,16 +135,20 @@ jobs:
           python3 -m pip cache purge || true
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
+          sudo rm -rf /tmp/* /var/tmp/* || true
           df -h / "$GITHUB_WORKSPACE"
 
       - name: Run build
         run: |
           set -euo pipefail
 
-          export ANDROID_HOME="$RUNNER_TEMP/android-sdk"
-          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          mkdir -p "$TMPDIR" "$GRADLE_USER_HOME" "$ANDROID_SDK_ROOT"
+          chmod 700 "$TMPDIR"
+
+          # Confirm large paths are on the workspace volume, not root.
+          df -h / "$GITHUB_WORKSPACE"
+
           sdk_root="$ANDROID_SDK_ROOT"
-          mkdir -p "$sdk_root"
 
           find_sdkmanager() {
             find "$sdk_root/cmdline-tools" -type f -path '*/bin/sdkmanager' -perm -u+x 2>/dev/null | head -n 1
