@@ -68,6 +68,8 @@ jobs:
       GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
       ANDROID_HOME: ${{ github.workspace }}/.android-sdk
       ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
+      XDG_CACHE_HOME: ${{ github.workspace }}/.cache
+      PIP_NO_CACHE_DIR: "1"
 
     steps:
       - name: Parameters
@@ -82,20 +84,34 @@ jobs:
       - name: Clean runner
         run: |
           docker rmi $(docker images -q) || true
-          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d || true
+          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/share/swift || true
           sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
           sudo apt -y autoremove --purge || true
-          sudo apt -y autoclean || true
-          sudo apt clean || true
+
+      # Install system packages before "Maximize disk" so they come out of the
+      # free space pool instead of the fixed root reserve.
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip zipalign apksigner xmlstarlet aapt p7zip-full
+          python3 -m pip install --user --no-cache-dir ConfigObj pyTelegramBotAPI pytz requests cryptography
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* || true
+          sudo journalctl --vacuum-size=50M || true
+          df -h /
 
       - name: Maximize disk
         uses: easimon/maximize-build-space@master
         with:
-          # Keep enough space on the runner root for Actions worker diagnostics.
-          root-reserve-mb: 8192
-          # The action always creates an LVM swap LV; zero makes lvcreate fail.
-          # Keep only a minimal valid swap so almost all space remains for buildlv.
-          swap-size-mb: 64
+          # Keep enough space on the runner root for the Actions worker, step
+          # logs and anything that still writes to / (sudo drops TMPDIR).
+          root-reserve-mb: 12288
+          # Runner has 16 GB RAM; image tools (erofs, lpmake, 7z, apktool) can
+          # spike past that. Swap lives on the build volume, which has room.
+          swap-size-mb: 8192
           remove-dotnet: "true"
           remove-android: "true"
           remove-haskell: "true"
@@ -124,26 +140,26 @@ jobs:
 
       - name: Setup
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip zipalign apksigner xmlstarlet aapt p7zip-full
-          python3 -m pip install --user ConfigObj pyTelegramBotAPI pytz requests cryptography
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          sudo timedatectl set-timezone Asia/Ho_Chi_Minh
           chmod +x ./bhlnk bin/* || true
           aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
           chmod +x bin/rclone1
-          python3 -m pip cache purge || true
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-          sudo rm -rf /tmp/* /var/tmp/* || true
+          free -h
           df -h / "$GITHUB_WORKSPACE"
 
       - name: Run build
         run: |
           set -euo pipefail
 
-          mkdir -p "$TMPDIR" "$GRADLE_USER_HOME" "$ANDROID_SDK_ROOT"
+          mkdir -p "$TMPDIR" "$GRADLE_USER_HOME" "$ANDROID_SDK_ROOT" "$XDG_CACHE_HOME"
           chmod 700 "$TMPDIR"
+          # Java ignores TMPDIR; keep apktool/d8/gradle temp files off root.
+          export _JAVA_OPTIONS="-Djava.io.tmpdir=$TMPDIR"
+
+          # Print disk/memory every minute so the log shows what filled up.
+          ( while sleep 60; do
+              echo "[CI MONITOR] $(df -h --output=avail / | tail -1 | tr -d ' ') free on /, $(df -h --output=avail "$GITHUB_WORKSPACE" | tail -1 | tr -d ' ') free on workspace, $(free -m | awk '/Mem:/{print $7}')MB RAM available"
+            done ) &
+          monitor_pid=$!
 
           # Confirm large paths are on the workspace volume, not root.
           df -h / "$GITHUB_WORKSPACE"
@@ -207,6 +223,7 @@ jobs:
               -delete 2>/dev/null || true
             sudo find "$GITHUB_WORKSPACE" -mindepth 2 -maxdepth 2 -type d \
               -name firmware-update -exec rm -rf -- {} + 2>/dev/null || true
+            kill "$monitor_pid" 2>/dev/null || true
             df -h / "$GITHUB_WORKSPACE" || true
             return "$status"
           }
@@ -227,6 +244,15 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Diagnostics
+        if: ${{ failure() || cancelled() }}
+        run: |
+          free -h || true
+          df -h || true
+          sudo dmesg 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -20 || true
+          echo "Largest directories on root filesystem:"
+          sudo du -xh --max-depth=3 / 2>/dev/null | sort -rh | head -30 || true
 
       - name: Push stop notification
         if: ${{ failure() || cancelled() }}
