@@ -14,6 +14,7 @@ on:
         type: choice
         options:
           - vs
+          - ota
           - stock
           - stock-encrypted
       branch:
@@ -70,6 +71,8 @@ jobs:
       ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
       PIP_NO_CACHE_DIR: "1"
+      # GitHub runners already allow pip --user installs; act images enforce PEP 668.
+      PIP_BREAK_SYSTEM_PACKAGES: "1"
 
     steps:
       - name: Parameters
@@ -81,7 +84,10 @@ jobs:
           echo "actor=${{ github.actor }}"
           echo "run_id=${{ github.run_id }}"
 
+      # Steps guarded with env.ACT differ when the workflow runs locally
+      # through nektos/act (see .github/act/run-local.sh).
       - name: Clean runner
+        if: ${{ !env.ACT }}
         run: |
           docker rmi $(docker images -q) || true
           sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
@@ -97,13 +103,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip zipalign apksigner xmlstarlet aapt p7zip-full
           python3 -m pip install --user --no-cache-dir ConfigObj pyTelegramBotAPI pytz requests cryptography
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          sudo timedatectl set-timezone Asia/Ho_Chi_Minh
+          sudo timedatectl set-timezone Asia/Ho_Chi_Minh || sudo ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* || true
           sudo journalctl --vacuum-size=50M || true
           df -h /
 
       - name: Maximize disk
+        if: ${{ !env.ACT }}
         uses: easimon/maximize-build-space@master
         with:
           # Keep enough space on the runner root for the Actions worker, step
@@ -117,11 +124,17 @@ jobs:
           remove-haskell: "true"
 
       - name: Checkout
+        if: ${{ !env.ACT }}
         uses: actions/checkout@v5
         with:
           ssh-key: ${{ secrets.VS_BUILD_TOOL }}
           repository: buihien224/VS_Build_Tool
           ref: ${{ github.event.inputs.branch }}
+
+      # act copies the local working tree (including uncommitted changes).
+      - name: Checkout (local act)
+        if: ${{ env.ACT }}
+        uses: actions/checkout@v5
 
       - name: Validate build scripts
         run: |
@@ -221,6 +234,7 @@ jobs:
             sudo find "$GITHUB_WORKSPACE" -maxdepth 1 -type f \
               \( -name 'colourvs_*.7z' -o -name 'hypervs_*.7z' -o -name '*-ota_full-*.7z' \) \
               -delete 2>/dev/null || true
+            sudo rm -rf -- "$GITHUB_WORKSPACE/ota_out"
             sudo find "$GITHUB_WORKSPACE" -mindepth 2 -maxdepth 2 -type d \
               -name firmware-update -exec rm -rf -- {} + 2>/dev/null || true
             kill "$monitor_pid" 2>/dev/null || true
@@ -232,6 +246,9 @@ jobs:
           case "$BUILD_MODE" in
             vs)
               ./bhlnk build "$ROM_URL" "$BUILDER_NAME"
+              ;;
+            ota)
+              ./bhlnk buildota "$ROM_URL" "$BUILDER_NAME"
               ;;
             stock)
               ./bhlnk stock "$ROM_URL" "$BUILDER_NAME"
