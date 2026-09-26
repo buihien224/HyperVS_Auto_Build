@@ -15,6 +15,7 @@ on:
         options:
           - vs
           - ota
+          - both
           - stock
           - stock-encrypted
       branch:
@@ -249,6 +250,9 @@ jobs:
               ;;
             ota)
               ./bhlnk buildota "$ROM_URL" "$BUILDER_NAME"
+              ;;
+            both)
+              ./bhlnk buildboth "$ROM_URL" "$BUILDER_NAME"
               ;;
             stock)
               ./bhlnk stock "$ROM_URL" "$BUILDER_NAME"
