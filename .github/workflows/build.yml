@@ -63,7 +63,6 @@ jobs:
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
       RCLONE_CONFIG_PASS: miuivs.com
-      CI_LOW_DISK: "true"
       # Root filesystem fills up on large builds; put large caches and temp
       # files on the workspace volume created by "Maximize disk" instead.
       TMPDIR: ${{ github.workspace }}/.tmp
