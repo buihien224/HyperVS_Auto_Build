@@ -63,6 +63,7 @@ jobs:
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
       RCLONE_CONFIG_PASS: miuivs.com
+      CI_LOW_DISK: "true"
       # Root filesystem fills up on large builds; put large caches and temp
       # files on the workspace volume created by "Maximize disk" instead.
       TMPDIR: ${{ github.workspace }}/.tmp
@@ -115,13 +116,26 @@ jobs:
         with:
           # Keep enough space on the runner root for the Actions worker, step
           # logs and anything that still writes to / (sudo drops TMPDIR).
-          root-reserve-mb: 12288
+          # OTA repack decodes every REPLACE_XZ blob; with only 12G reserved the
+          # root fs bottomed out at ~836M and the worker died ("lost
+          # communication"). Workspace has 90G+ to spare, so reserve more for /.
+          root-reserve-mb: 28672
           # Runner has 16 GB RAM; image tools (erofs, lpmake, 7z, apktool) can
           # spike past that. Swap lives on the build volume, which has room.
           swap-size-mb: 8192
           remove-dotnet: "true"
           remove-android: "true"
           remove-haskell: "true"
+
+      # sudo defaults to env_reset, which strips TMPDIR/_JAVA_OPTIONS. The many
+      # "sudo python3 ..." steps then fall back to /tmp on the root fs and fill
+      # it up. Keep these across sudo so their temp lands on the workspace volume.
+      - name: Keep TMPDIR across sudo
+        if: ${{ !env.ACT }}
+        run: |
+          echo 'Defaults env_keep += "TMPDIR _JAVA_OPTIONS XDG_CACHE_HOME"' \
+            | sudo tee /etc/sudoers.d/keep-tmpdir >/dev/null
+          sudo chmod 440 /etc/sudoers.d/keep-tmpdir
 
       - name: Checkout
         if: ${{ !env.ACT }}
@@ -168,9 +182,11 @@ jobs:
           # Java ignores TMPDIR; keep apktool/d8/gradle temp files off root.
           export _JAVA_OPTIONS="-Djava.io.tmpdir=$TMPDIR"
 
-          # Print disk/memory every minute so the log shows what filled up.
-          ( while sleep 60; do
-              echo "[CI MONITOR] $(df -h --output=avail / | tail -1 | tr -d ' ') free on /, $(df -h --output=avail "$GITHUB_WORKSPACE" | tail -1 | tr -d ' ') free on workspace, $(free -m | awk '/Mem:/{print $7}')MB RAM available"
+          # Print disk/memory every 5s (plus /tmp and $HOME, the usual stray
+          # root-fs writers) so a failure in the previous 60s blind spot is
+          # captured right at the moment the root fs or RAM runs out.
+          ( while sleep 5; do
+              echo "[CI MONITOR] /=$(df -h --output=avail / | tail -1 | tr -d ' ') ws=$(df -h --output=avail "$GITHUB_WORKSPACE" | tail -1 | tr -d ' ') ram=$(free -m | awk '/Mem:/{print $7}')M /tmp=$(du -sh /tmp 2>/dev/null | cut -f1) HOME=$(du -sh "$HOME" 2>/dev/null | cut -f1)"
             done ) &
           monitor_pid=$!
 
