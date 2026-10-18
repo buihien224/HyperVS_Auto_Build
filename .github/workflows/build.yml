@@ -14,10 +14,7 @@ on:
         type: choice
         options:
           - vs
-          - ota
-          - both
           - stock
-          - stock-encrypted
       branch:
         description: "Tool branch"
         required: true
@@ -27,7 +24,7 @@ on:
           - PREVIEW
           - STABLE
       region:
-        description: "ColorOS region for encrypted stock builds"
+        description: "ColorOS region for stock builds of a codename"
         required: false
         default: "cn"
       key:
@@ -38,6 +35,10 @@ on:
         description: "Builder name"
         required: true
         default: "Auto_Build"
+      super_size:
+        description: "Custom super size in bytes (empty: the stock size)"
+        required: false
+        default: ""
 
 jobs:
   Auth:
@@ -60,6 +61,7 @@ jobs:
       TOOL_BRANCH: ${{ github.event.inputs.branch }}
       ROM_REGION: ${{ github.event.inputs.region || 'cn' }}
       BUILDER_NAME: ${{ github.event.inputs.trigger }}
+      SUPER_SIZE: ${{ github.event.inputs.super_size }}
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
       RCLONE_CONFIG_PASS: miuivs.com
@@ -82,6 +84,7 @@ jobs:
           echo "BUILD_MODE=$BUILD_MODE"
           echo "TOOL_BRANCH=$TOOL_BRANCH"
           echo "BUILDER_NAME=$BUILDER_NAME"
+          echo "SUPER_SIZE=${SUPER_SIZE:-stock}"
           echo "actor=${{ github.actor }}"
           echo "run_id=${{ github.run_id }}"
 
@@ -181,6 +184,14 @@ jobs:
           chmod 700 "$TMPDIR"
           # Java ignores TMPDIR; keep apktool/d8/gradle temp files off root.
           export _JAVA_OPTIONS="-Djava.io.tmpdir=$TMPDIR"
+          # Compression (7za, mkfs.erofs, delta_generator) and payload decoding
+          # get half of the runner's CPUs: with every core busy the runner stops
+          # answering and GitHub cancels the job ("lost communication").
+          cpus="$(nproc)"
+          export VS_BUILD_CPUS="$(( cpus > 2 ? cpus / 2 : 1 ))"
+          echo "VS_BUILD_CPUS=$VS_BUILD_CPUS of $cpus"
+          # A forced super size replaces the one read from the stock payload.
+          [[ -z "$SUPER_SIZE" ]] || export VS_SUPER_SIZE="$SUPER_SIZE"
 
           # Print disk/memory every 5s (plus /tmp and $HOME, the usual stray
           # root-fs writers) so a failure in the previous 60s blind spot is
@@ -261,19 +272,13 @@ jobs:
           export NOTIFY_GITLOG="$(git log -1 --pretty=format:%s)"
           case "$BUILD_MODE" in
             vs)
+              # One package for both VSTeam OTA and VSTool fastboot installs.
               ./bhlnk build "$ROM_URL" "$BUILDER_NAME"
               ;;
-            ota)
-              ./bhlnk buildota "$ROM_URL" "$BUILDER_NAME"
-              ;;
-            both)
-              ./bhlnk buildboth "$ROM_URL" "$BUILDER_NAME"
-              ;;
             stock)
-              ./bhlnk stock "$ROM_URL" "$BUILDER_NAME"
-              ;;
-            stock-encrypted)
-              ./bhlnk buildstock "$ROM_URL" "$ROM_REGION" "$BUILDER_NAME" --enc
+              # Same package format, unlocked. The region only matters when
+              # ROM_URL is a ColorOS codename.
+              COLOROS_REGION="$ROM_REGION" ./bhlnk stock "$ROM_URL" "$BUILDER_NAME"
               ;;
             *)
               echo "Unknown BUILD_MODE: $BUILD_MODE"
