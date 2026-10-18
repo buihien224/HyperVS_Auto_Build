@@ -187,10 +187,11 @@ jobs:
           # Java ignores TMPDIR; keep apktool/d8/gradle temp files off root.
           export _JAVA_OPTIONS="-Djava.io.tmpdir=$TMPDIR"
           # Compression (7za, mkfs.erofs, delta_generator) and payload decoding
-          # get half of the runner's CPUs: with every core busy the runner stops
-          # answering and GitHub cancels the job ("lost communication").
+          # get all but one of the runner's CPUs: with every core busy the runner
+          # stops answering and GitHub cancels the job ("lost communication").
+          # Half of them made PackOTA take ~43 min on a 4-CPU runner.
           cpus="$(nproc)"
-          export VS_BUILD_CPUS="$(( cpus > 2 ? cpus / 2 : 1 ))"
+          export VS_BUILD_CPUS="$(( cpus > 1 ? cpus - 1 : 1 ))"
           echo "VS_BUILD_CPUS=$VS_BUILD_CPUS of $cpus"
           # A forced super size replaces the one read from the stock payload.
           [[ -z "$SUPER_SIZE" ]] || export VS_SUPER_SIZE="$SUPER_SIZE"
