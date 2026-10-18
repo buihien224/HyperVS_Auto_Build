@@ -1,4 +1,6 @@
 name: VS Build Tool
+# The dashboard (Build > GitHub Actions) reads mode, builder and ROM from the run name.
+run-name: "${{ inputs.mode }} | ${{ inputs.trigger }} | ${{ inputs.ROM_URL }}"
 
 on:
   workflow_dispatch:
@@ -193,14 +195,6 @@ jobs:
           # A forced super size replaces the one read from the stock payload.
           [[ -z "$SUPER_SIZE" ]] || export VS_SUPER_SIZE="$SUPER_SIZE"
 
-          # Print disk/memory every 5s (plus /tmp and $HOME, the usual stray
-          # root-fs writers) so a failure in the previous 60s blind spot is
-          # captured right at the moment the root fs or RAM runs out.
-          ( while sleep 5; do
-              echo "[CI MONITOR] /=$(df -h --output=avail / | tail -1 | tr -d ' ') ws=$(df -h --output=avail "$GITHUB_WORKSPACE" | tail -1 | tr -d ' ') ram=$(free -m | awk '/Mem:/{print $7}')M /tmp=$(du -sh /tmp 2>/dev/null | cut -f1) HOME=$(du -sh "$HOME" 2>/dev/null | cut -f1)"
-            done ) &
-          monitor_pid=$!
-
           # Confirm large paths are on the workspace volume, not root.
           df -h / "$GITHUB_WORKSPACE"
 
@@ -264,7 +258,6 @@ jobs:
             sudo rm -rf -- "$GITHUB_WORKSPACE/ota_out"
             sudo find "$GITHUB_WORKSPACE" -mindepth 2 -maxdepth 2 -type d \
               -name firmware-update -exec rm -rf -- {} + 2>/dev/null || true
-            kill "$monitor_pid" 2>/dev/null || true
             df -h / "$GITHUB_WORKSPACE" || true
             return "$status"
           }
