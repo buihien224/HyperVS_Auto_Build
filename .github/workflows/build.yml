@@ -74,6 +74,20 @@ jobs:
       NOTIFY_ACTION_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY_RUN_ID: ${{ github.run_id }}
       RCLONE_CONFIG_PASS: miuivs.com
+      # Cloudflare R2 (bucket vs-ota-stable): patchvs.sh upload_to_r2 puts each
+      # ST package at <DEVICE>/<file> (PRE at PREVIEW/<DEVICE>/) right after
+      # the build and removes the device's older ST, as the local farm does.
+      # Without VS_R2_BUCKET the step is skipped silently: on 2026-11-26 the
+      # main drive was full and 39 builds of this workflow never reached R2.
+      # Same remote as the farm (~/.config/vsteam/farm.env); keys are secrets.
+      VS_R2_BUCKET: ${{ secrets.VS_R2_BUCKET }}
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+      RCLONE_CONFIG_R2_NO_HEAD: "true"
       CI_LOW_DISK: "true"
       # Root filesystem fills up on large builds; put large caches and temp
       # files on the workspace volume created by "Maximize disk" instead.
@@ -94,6 +108,11 @@ jobs:
           echo "TOOL_BRANCH=$TOOL_BRANCH"
           echo "BUILDER_NAME=$BUILDER_NAME"
           echo "SUPER_SIZE=${SUPER_SIZE:-stock}"
+          if [ -n "$VS_R2_BUCKET" ] && [ -n "$RCLONE_CONFIG_R2_ACCESS_KEY_ID" ]; then
+            echo "R2 upload: on (bucket $VS_R2_BUCKET)"
+          else
+            echo "::warning title=R2 upload off::Secrets VS_R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_ENDPOINT are not set: the package will not reach R2"
+          fi
           echo "actor=${{ github.actor }}"
           echo "run_id=${{ github.run_id }}"
 
