@@ -1,37 +1,39 @@
 name: Stock Merge
-# Custom ROM = base stock ROM + donor partitions, packed as a stock OTA or run
-# through the full VS patch pipeline (--mode vs). Upload goes to
-# "$UPLOAD_REMOTE:$UPLOAD_DIR" (default gdrive3:custom_ota) via rclone in
-# bin/stock_merge.sh; nothing in this workflow posts to Telegram.
-run-name: "StockMerge ${{ inputs.mode }} | ${{ inputs.trigger }} | ${{ inputs.ROM_URL }}"
+# Custom ROM = base stock ROM + donor partitions: both ROMs are unpacked, the
+# donor partitions replace the base ones in one flat folder, and the result is
+# rebuilt and signed as a full OTA payload with VS Build Tool's own packer
+# (bin/ota_payload.py + bin/delta_generator + bin/ota_keys). Upload goes to
+# "$UPLOAD_REMOTE:$UPLOAD_DIR" (default gdrive3:custom_ota) via rclone;
+# nothing in this workflow posts to Telegram.
+run-name: "StockMerge | ${{ inputs.trigger }} | ${{ inputs.ROM_URL }}"
 
 on:
   workflow_dispatch:
     inputs:
       ROM_URL:
-        description: "Base stock ROM: OTA URL, codename or local zip"
+        description: "Base stock ROM: OTA URL or local zip"
         required: true
         default: ""
       DONOR_URL:
-        description: "Donor ROM: OTA URL, codename or local zip"
+        description: "Donor ROM: OTA URL or local zip"
         required: true
         default: ""
       PARTITIONS:
-        description: "Partitions to take from the donor: name,name2 or dst=src (comma separated)"
-        required: true
+        description: "Partitions to take from the donor: name,name2 or dst=src. Empty + Donor device = planned from the FFF config"
+        required: false
+        default: ""
+      donor_device:
+        description: "Donor/base device code (CPH2645, PJE110...): resolves PARTITIONS from fff/file_change_config.json when that input is empty"
+        required: false
+        default: ""
+      file_types:
+        description: "Override the FFF config file types (ODM,REGION,MCF_OTA,MODEM,OPLUSTANVBK)"
+        required: false
         default: ""
       META_URL:
         description: "ota_meta JSON (URL or path). Empty: dumped from the base payload.bin"
         required: false
         default: ""
-      mode:
-        description: "Pack mode"
-        required: true
-        default: "stock"
-        type: choice
-        options:
-          - stock
-          - vs
       branch:
         description: "Tool branch"
         required: true
@@ -39,8 +41,6 @@ on:
         type: choice
         options:
           - BRICK
-          - PREVIEW
-          - STABLE
       device:
         description: "Device code override (empty: inferred from the meta)"
         required: false
@@ -75,10 +75,13 @@ on:
         required: false
         default: "custom_ota"
 
-# VS_NO_PUBLISH=true mutes every Telegram path in patchvs.sh; the rclone
-# upload in bin/stock_merge.sh does not depend on it.
 env:
-  VS_OTA_ZIP_SECRET_V3: ${{ secrets.VS_OTA_ZIP_SECRET_V3 }}
+  RCLONE_CONFIG_PASS: miuivs.com
+  CI_LOW_DISK: "true"
+  TMPDIR: ${{ github.workspace }}/.tmp
+  XDG_CACHE_HOME: ${{ github.workspace }}/.cache
+  PIP_NO_CACHE_DIR: "1"
+  PIP_BREAK_SYSTEM_PACKAGES: "1"
 
 jobs:
   Auth:
@@ -99,8 +102,9 @@ jobs:
       ROM_URL: ${{ github.event.inputs.ROM_URL }}
       DONOR_URL: ${{ github.event.inputs.DONOR_URL }}
       PARTITIONS: ${{ github.event.inputs.PARTITIONS }}
+      DONOR_DEVICE: ${{ github.event.inputs.donor_device }}
+      FILE_TYPES: ${{ github.event.inputs.file_types }}
       META_URL: ${{ github.event.inputs.META_URL }}
-      MERGE_MODE: ${{ github.event.inputs.mode }}
       TOOL_BRANCH: ${{ github.event.inputs.branch }}
       DEVICE_CODE: ${{ github.event.inputs.device }}
       BASE_REGION: ${{ github.event.inputs.base_region || 'cn' }}
@@ -109,35 +113,21 @@ jobs:
       UPLOAD_ENABLED: ${{ github.event.inputs.upload }}
       UPLOAD_REMOTE: ${{ github.event.inputs.upload_remote || 'gdrive3' }}
       UPLOAD_DIR: ${{ github.event.inputs.upload_dir || 'custom_ota' }}
-      RCLONE_CONFIG_PASS: miuivs.com
-      CI_LOW_DISK: "true"
-      # Root filesystem fills up on large builds; put large caches and temp
-      # files on the workspace volume created by "Maximize disk" instead.
-      TMPDIR: ${{ github.workspace }}/.tmp
-      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
-      ANDROID_HOME: ${{ github.workspace }}/.android-sdk
-      ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
-      XDG_CACHE_HOME: ${{ github.workspace }}/.cache
-      PIP_NO_CACHE_DIR: "1"
-      PIP_BREAK_SYSTEM_PACKAGES: "1"
-      VS_NO_PUBLISH: "true"
 
     steps:
       - name: Parameters
         run: |
           echo "ROM_URL=$ROM_URL"
           echo "DONOR_URL=$DONOR_URL"
-          echo "PARTITIONS=$PARTITIONS"
-          echo "META_URL=${META_URL:-auto}"
-          echo "MERGE_MODE=$MERGE_MODE"
+          echo "PARTITIONS=${PARTITIONS:-auto from FFF config}"
+          echo "DONOR_DEVICE=${DONOR_DEVICE:-none} FILE_TYPES=${FILE_TYPES:-auto}"
+          echo "META_URL=${META_URL:-auto from base payload}"
           echo "TOOL_BRANCH=$TOOL_BRANCH"
           echo "BUILDER_NAME=$BUILDER_NAME"
           echo "upload=$UPLOAD_ENABLED -> $UPLOAD_REMOTE:$UPLOAD_DIR"
           echo "actor=${{ github.actor }}"
           echo "run_id=${{ github.run_id }}"
 
-      # Steps guarded with env.ACT differ when the workflow runs locally
-      # through nektos/act (see .github/act/run-local.sh).
       - name: Clean runner
         if: ${{ !env.ACT }}
         run: |
@@ -150,13 +140,12 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip zipalign apksigner xmlstarlet aapt p7zip-full
-          python3 -m pip install --user --no-cache-dir ConfigObj pytz requests cryptography
+          sudo apt-get install -y --no-install-recommends git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip p7zip-full
+          python3 -m pip install --user --no-cache-dir requests cryptography
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           sudo timedatectl set-timezone Asia/Ho_Chi_Minh || sudo ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* || true
-          sudo journalctl --vacuum-size=50M || true
           df -h /
 
       - name: Maximize disk
@@ -170,13 +159,6 @@ jobs:
           remove-dotnet: "true"
           remove-android: "true"
           remove-haskell: "true"
-
-      - name: Keep TMPDIR across sudo
-        if: ${{ !env.ACT }}
-        run: |
-          echo 'Defaults env_keep += "TMPDIR _JAVA_OPTIONS XDG_CACHE_HOME"' \
-            | sudo tee /etc/sudoers.d/keep-tmpdir >/dev/null
-          sudo chmod 440 /etc/sudoers.d/keep-tmpdir
 
       - name: Checkout
         if: ${{ !env.ACT }}
@@ -193,71 +175,18 @@ jobs:
 
       - name: Validate build scripts
         run: |
-          bash -n ./bhlnk bin/stock_merge.sh
-          python3 -m py_compile bin/ota_payload.py bin/payload_extract.py
+          bash -n bin/stock_merge.sh
+          python3 -m py_compile bin/ota_payload.py bin/payload_extract.py bin/oppo_resolver.py
+          python3 -m py_compile fff/*.py
 
       - name: Setup
         run: |
-          chmod +x ./bhlnk bin/* || true
+          chmod +x bin/* || true
           aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
           chmod +x bin/rclone1
+          openssl x509 -in bin/ota_keys/ota.x509.pem -noout -pubkey >/dev/null
           free -h
           df -h / "$GITHUB_WORKSPACE"
-
-      # The VS pipeline (mode=vs) rebuilds the VS app modules and needs the
-      # SDK; plain stock packing (mode=stock) only needs python + delta_generator.
-      - name: Setup Java 17
-        if: ${{ inputs.mode == 'vs' }}
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
-          cache-dependency-path: |
-            backend/*.gradle.kts
-            backend/gradle/wrapper/gradle-wrapper.properties
-
-      - name: Setup Android SDK
-        if: ${{ inputs.mode == 'vs' }}
-        run: |
-          set -euo pipefail
-          sdk_root="$ANDROID_SDK_ROOT"
-
-          find_sdkmanager() {
-            find "$sdk_root/cmdline-tools" -type f -path '*/bin/sdkmanager' -perm -u+x 2>/dev/null | head -n 1
-          }
-
-          sdkmanager="$(find_sdkmanager || true)"
-          if [[ -z "$sdkmanager" ]]; then
-            command_tools_url="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
-            tools_tmp="$(mktemp -d)"
-            trap 'rm -rf "$tools_tmp"' EXIT
-            curl --fail --location --retry 5 --retry-all-errors \
-              --connect-timeout 20 --max-time 300 \
-              "$command_tools_url" -o "$tools_tmp/commandlinetools.zip"
-            unzip -q "$tools_tmp/commandlinetools.zip" -d "$tools_tmp/unpacked"
-            rm -rf "$sdk_root/cmdline-tools/latest"
-            mkdir -p "$sdk_root/cmdline-tools/latest"
-            mv "$tools_tmp/unpacked/cmdline-tools"/* "$sdk_root/cmdline-tools/latest/"
-            sdkmanager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
-            chmod +x "$sdkmanager"
-          fi
-
-          sdk_bin="$(dirname "$sdkmanager")"
-          export PATH="$sdk_bin:$sdk_root/platform-tools:$PATH"
-          packages=()
-          [[ -x "$sdk_root/platform-tools/adb" && -x "$sdk_root/platform-tools/fastboot" ]] || packages+=("platform-tools")
-          [[ -f "$sdk_root/platforms/android-34/android.jar" ]] || packages+=("platforms;android-34")
-          [[ -x "$sdk_root/build-tools/34.0.0/aapt" ]] || packages+=("build-tools;34.0.0")
-          if ((${#packages[@]})); then
-            yes | "$sdkmanager" --sdk_root="$sdk_root" --licenses >/dev/null || true
-            "$sdkmanager" --sdk_root="$sdk_root" "${packages[@]}"
-          fi
-          test -x "$sdk_root/platform-tools/adb"
-          test -f "$sdk_root/platforms/android-34/android.jar"
-          test -x "$sdk_root/build-tools/34.0.0/aapt"
-          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > backend/local.properties
-          test -s backend/local.properties
 
       - name: Run merge
         run: |
@@ -265,19 +194,20 @@ jobs:
 
           mkdir -p "$TMPDIR" "$XDG_CACHE_HOME"
           chmod 700 "$TMPDIR"
-          export _JAVA_OPTIONS="-Djava.io.tmpdir=$TMPDIR"
           # Compression and payload decoding get all but one CPU so the runner
           # keeps answering GitHub's agent.
           cpus="$(nproc)"
           export VS_BUILD_CPUS="$(( cpus > 1 ? cpus - 1 : 1 ))"
+          export VS_EXTRACT_JOBS="$VS_BUILD_CPUS"
           echo "VS_BUILD_CPUS=$VS_BUILD_CPUS of $cpus"
           df -h / "$GITHUB_WORKSPACE"
 
-          # bin/stock_merge.sh also exports VS_NO_PUBLISH=true; both ends are
-          # covered so the VS pipeline never posts to Telegram.
-          args=(--base "$ROM_URL" --donor "$DONOR_URL" --partitions "$PARTITIONS"
-                --mode "$MERGE_MODE" --builder "$BUILDER_NAME"
+          args=(--base "$ROM_URL" --donor "$DONOR_URL"
+                --builder "$BUILDER_NAME"
                 --base-region "$BASE_REGION" --donor-region "$DONOR_REGION")
+          [[ -z "$PARTITIONS" ]] || args+=(--partitions "$PARTITIONS")
+          [[ -z "$DONOR_DEVICE" ]] || args+=(--device-code "$DONOR_DEVICE")
+          [[ -z "$FILE_TYPES" ]] || args+=(--file-types "$FILE_TYPES")
           [[ -z "$META_URL" ]] || args+=(--meta "$META_URL")
           [[ -z "$DEVICE_CODE" ]] || args+=(--device "$DEVICE_CODE")
           if [[ "$UPLOAD_ENABLED" == "true" ]]; then
@@ -288,8 +218,7 @@ jobs:
           cleanup_ci_workspace() {
             status=$?
             echo "[CI CLEANUP] Releasing build intermediates (status=$status)"
-            sudo rm -rf -- "$GITHUB_WORKSPACE/zip_temp" "$GITHUB_WORKSPACE/jar_temp" \
-              "$GITHUB_WORKSPACE/img_temp" "$GITHUB_WORKSPACE/.stockmerge"
+            sudo rm -rf -- "$GITHUB_WORKSPACE/.stockmerge" "$GITHUB_WORKSPACE/.tmp"
             sudo find "$GITHUB_WORKSPACE" -maxdepth 3 -type f \
               \( -name '*.raw' -o -name '*.seed' -o -name 'payload.bin' \) \
               -delete 2>/dev/null || true
