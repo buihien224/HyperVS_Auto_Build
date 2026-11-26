@@ -5,7 +5,7 @@ name: Stock Merge
 # (bin/ota_payload.py + bin/delta_generator + bin/ota_keys). Upload goes to
 # "$UPLOAD_REMOTE:$UPLOAD_DIR" (default gdrive3:custom_ota) via rclone;
 # nothing in this workflow posts to Telegram.
-run-name: "StockMerge | ${{ inputs.trigger }} | ${{ inputs.ROM_URL }}"
+run-name: "🏭 StockMerge · ${{ inputs.trigger }} · ${{ inputs.PARTITIONS || format('auto({0})', inputs.donor_device || 'fff') }}"
 
 on:
   workflow_dispatch:
@@ -31,7 +31,23 @@ on:
         required: false
         default: ""
       META_URL:
-        description: "ota_meta JSON (URL or path). Empty: dumped from the base payload.bin"
+        description: "ota_meta JSON URL, repo path (meta/device_info_*.json), local json/zip, or a FULL OTA package link (downloaded and dumped automatically). Empty: dumped from the base payload.bin"
+        required: false
+        default: ""
+      meta_device:
+        description: "Pick a cached layout by device code (PLG110, CPH2791...): uses meta/device_info_<code>.json from the repo. Ignored when META_URL is set"
+        required: false
+        default: ""
+      as_device:
+        description: "Force the package pre-device to this code AND swap the code inside every metadata value that embeds it. Empty: pre-device follows the base ROM (ROM_URL)"
+        required: false
+        default: ""
+      as_project:
+        description: "oplus_separate_soft (Oppo project number) to write into the package metadata and payload properties. Empty: follows the chosen meta"
+        required: false
+        default: ""
+      identity_url:
+        description: "JSON file or URL whose keys patch the package metadata (pre-device, my_manifest, oplus_separate_soft, ...) on top of the chosen meta"
         required: false
         default: ""
       branch:
@@ -42,7 +58,7 @@ on:
         options:
           - BRICK
       device:
-        description: "Device code override (empty: inferred from the meta)"
+        description: "Device code override for the package name (empty: taken from the base ROM)"
         required: false
         default: ""
       base_region:
@@ -105,6 +121,10 @@ jobs:
       DONOR_DEVICE: ${{ github.event.inputs.donor_device }}
       FILE_TYPES: ${{ github.event.inputs.file_types }}
       META_URL: ${{ github.event.inputs.META_URL }}
+      META_DEVICE: ${{ github.event.inputs.meta_device }}
+      AS_DEVICE: ${{ github.event.inputs.as_device }}
+      AS_PROJECT: ${{ github.event.inputs.as_project }}
+      IDENTITY_URL: ${{ github.event.inputs.identity_url }}
       TOOL_BRANCH: ${{ github.event.inputs.branch }}
       DEVICE_CODE: ${{ github.event.inputs.device }}
       BASE_REGION: ${{ github.event.inputs.base_region || 'cn' }}
@@ -115,30 +135,50 @@ jobs:
       UPLOAD_DIR: ${{ github.event.inputs.upload_dir || 'custom_ota' }}
 
     steps:
-      - name: Parameters
+      - name: 🧾 Parameters
         run: |
-          echo "ROM_URL=$ROM_URL"
-          echo "DONOR_URL=$DONOR_URL"
-          echo "PARTITIONS=${PARTITIONS:-auto from FFF config}"
-          echo "DONOR_DEVICE=${DONOR_DEVICE:-none} FILE_TYPES=${FILE_TYPES:-auto}"
-          echo "META_URL=${META_URL:-auto from base payload}"
-          echo "TOOL_BRANCH=$TOOL_BRANCH"
-          echo "BUILDER_NAME=$BUILDER_NAME"
-          echo "upload=$UPLOAD_ENABLED -> $UPLOAD_REMOTE:$UPLOAD_DIR"
-          echo "actor=${{ github.actor }}"
-          echo "run_id=${{ github.run_id }}"
+          trunc() { local s=$1 n=$2; if (( ${#s} > n )); then printf '%s … (%d chars)' "${s:0:n}" "${#s}"; else printf '%s' "$s"; fi; }
+          show() { printf '%-13s %s\n' "$1" "$2"; }
+          echo "──────────────────────────────────────────────"
+          show "base"      "$(trunc "$ROM_URL" 90)"
+          show "donor"     "$(trunc "$DONOR_URL" 90)"
+          show "partitions" "${PARTITIONS:-auto (FFF config)}"
+          show "donor_dev" "${DONOR_DEVICE:-—} · file_types=${FILE_TYPES:-auto}"
+          show "meta"      "${META_DEVICE:+meta_device=$META_DEVICE}${META_URL:+ $(trunc "$META_URL" 60)}${META_URL:-(auto from base)}"
+          show "identity"  "as_device=${AS_DEVICE:-(auto)} · as_project=${AS_PROJECT:-(auto)} · identity=${IDENTITY_URL:+set}${IDENTITY_URL:-none}"
+          show "branch"    "$TOOL_BRANCH"
+          show "builder"   "$BUILDER_NAME"
+          show "upload"    "$UPLOAD_ENABLED → $UPLOAD_REMOTE:$UPLOAD_DIR"
+          show "actor/run" "${{ github.actor }} · ${{ github.run_id }}"
+          echo "──────────────────────────────────────────────"
+          {
+            echo "## 🧾 Stock merge inputs"
+            echo ""
+            echo "| Input | Value |"
+            echo "|---|---|"
+            echo "| Base ROM | \`$(trunc "$ROM_URL" 80)\` |"
+            echo "| Donor ROM | \`$(trunc "$DONOR_URL" 80)\` |"
+            echo "| Partitions | ${PARTITIONS:-auto from FFF config} |"
+            echo "| Meta | ${META_DEVICE:+**meta_device $META_DEVICE**}${META_URL:+ \`$(trunc "$META_URL" 60)\`}${META_DEVICE:-auto from base payload} |"
+            echo "| Identity | as_device \`${AS_DEVICE:-(auto)}\` · as_project \`${AS_PROJECT:-(auto)}\` |"
+            echo "| Upload | $UPLOAD_ENABLED → **$UPLOAD_REMOTE:$UPLOAD_DIR** |"
+            echo "| Branch / builder | \`$TOOL_BRANCH\` · $BUILDER_NAME |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Clean runner
+      - name: 🧹 Clean runner
         if: ${{ !env.ACT }}
         run: |
+          echo "::group::Clean runner"
           docker rmi $(docker images -q) || true
           sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
             /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/share/swift || true
           sudo apt -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* mysql* php* || true
           sudo apt -y autoremove --purge || true
+          echo "::endgroup::"
 
-      - name: Install system packages
+      - name: 📦 Install system packages
         run: |
+          echo "::group::Install system packages"
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends git lz4 wget zip unzip android-sdk-libsparse-utils brotli aria2 python3-pip p7zip-full
           python3 -m pip install --user --no-cache-dir requests cryptography
@@ -146,6 +186,7 @@ jobs:
           sudo timedatectl set-timezone Asia/Ho_Chi_Minh || sudo ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* || true
+          echo "::endgroup::"
           df -h /
 
       - name: Maximize disk
@@ -173,22 +214,26 @@ jobs:
         if: ${{ env.ACT }}
         uses: actions/checkout@v5
 
-      - name: Validate build scripts
+      - name: ✅ Validate build scripts
         run: |
+          echo "::group::Syntax + compile checks"
           bash -n bin/stock_merge.sh
           python3 -m py_compile bin/ota_payload.py bin/payload_extract.py bin/oppo_resolver.py
           python3 -m py_compile fff/*.py
+          echo "::endgroup::"
 
-      - name: Setup
+      - name: 🛠 Setup
         run: |
+          echo "::group::Setup tools + keys"
           chmod +x bin/* || true
           aria2c -x 16 -s 16 -j 1 -o bin/rclone1 https://github.com/buihien224/toolbox_notification/releases/download/rclone/rclone1
           chmod +x bin/rclone1
           openssl x509 -in bin/ota_keys/ota.x509.pem -noout -pubkey >/dev/null
+          echo "::endgroup::"
           free -h
           df -h / "$GITHUB_WORKSPACE"
 
-      - name: Run merge
+      - name: 🔨 Run merge
         run: |
           set -euo pipefail
 
@@ -199,6 +244,7 @@ jobs:
           cpus="$(nproc)"
           export VS_BUILD_CPUS="$(( cpus > 1 ? cpus - 1 : 1 ))"
           export VS_EXTRACT_JOBS="$VS_BUILD_CPUS"
+          export VS_SUMMARY_FILE="$GITHUB_WORKSPACE/build_summary.env"
           echo "VS_BUILD_CPUS=$VS_BUILD_CPUS of $cpus"
           df -h / "$GITHUB_WORKSPACE"
 
@@ -209,6 +255,10 @@ jobs:
           [[ -z "$DONOR_DEVICE" ]] || args+=(--device-code "$DONOR_DEVICE")
           [[ -z "$FILE_TYPES" ]] || args+=(--file-types "$FILE_TYPES")
           [[ -z "$META_URL" ]] || args+=(--meta "$META_URL")
+          [[ -z "$META_DEVICE" ]] || args+=(--meta-device "$META_DEVICE")
+          [[ -z "$AS_DEVICE" ]] || args+=(--as-device "$AS_DEVICE")
+          [[ -z "$AS_PROJECT" ]] || args+=(--as-project "$AS_PROJECT")
+          [[ -z "$IDENTITY_URL" ]] || args+=(--identity "$IDENTITY_URL")
           [[ -z "$DEVICE_CODE" ]] || args+=(--device "$DEVICE_CODE")
           if [[ "$UPLOAD_ENABLED" == "true" ]]; then
             args+=(--upload --upload-remote "$UPLOAD_REMOTE" --upload-dir "$UPLOAD_DIR")
@@ -229,21 +279,38 @@ jobs:
 
           bin/stock_merge.sh "${args[@]}"
 
-      - name: Package link
-        if: ${{ !failure() && !cancelled() }}
+      - name: 📊 Summary
+        if: ${{ always() }}
         run: |
-          out="$(ls -1t ota_out/*.zip 2>/dev/null | head -n 1 || true)"
-          if [[ -z "$out" ]]; then
-            echo "No package left in ota_out/ (uploaded and cleaned up)."
-            exit 0
-          fi
-          echo "Package: $out ($(du -h -- "$out" | cut -f1))" | tee -a "$GITHUB_STEP_SUMMARY"
-          if [[ "$UPLOAD_ENABLED" == "true" ]]; then
-            link="$(bin/rclone1 link "$UPLOAD_REMOTE:$UPLOAD_DIR/$(basename -- "$out")" \
-              --config bin/rclone.conf 2>/dev/null || true)"
-            [[ -z "$link" ]] || {
-              echo "Download: $link" | tee -a "$GITHUB_STEP_SUMMARY"
-            }
+          sum="$GITHUB_STEP_SUMMARY"
+          if [[ -f build_summary.env ]]; then
+            # shellcheck disable=SC1091
+            source build_summary.env
+            {
+              echo "## 📦 Build result"
+              echo ""
+              echo "| | |"
+              echo "|---|---|"
+              echo "| **Package** | \`${package}\` |"
+              echo "| **Device (pre-device = ROM_URL)** | **${pre_device}** |"
+              echo "| **Design meta** | **${design}** · \`${my_manifest}\` |"
+              echo "| **Partitions packed** | ${partitions} |"
+              echo "| **Size** | ${size} |"
+              echo "| **Upload** | ${uploaded} → \`${remote}/${package}\` |"
+              echo "| **Builder** | ${builder:-?} · ⏱ ${elapsed:-?} |"
+            } >> "$sum"
+            if [[ "$uploaded" == "true" && -x bin/rclone1 ]]; then
+              link="$(bin/rclone1 link "$remote/$package" --config bin/rclone.conf 2>/dev/null || true)"
+              if [[ -n "$link" ]]; then
+                { echo ""; echo "**⬇️ Download: $link**"; } >> "$sum"
+              fi
+            fi
+          else
+            {
+              echo "## ❌ Build failed"
+              echo ""
+              echo "Check the **🔨 Run merge** step log above — the script logs every phase ([stock_merge] lines, collapsed groups)."
+            } >> "$sum"
           fi
 
       - name: Diagnostics
